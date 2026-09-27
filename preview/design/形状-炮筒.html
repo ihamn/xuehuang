@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>雪皇的后厨 · 炮筒（三尺寸 × 喷火）</title>
+<style>
+  :root{ --text:#EEF3FC; --dim:#93a3c4; --gold:#FFD682; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#080b12;color:var(--text);font-family:"Microsoft YaHei","PingFang SC",sans-serif;padding:24px 30px 56px}
+  h1{font-size:20px;font-weight:600} h1 em{color:var(--gold);font-style:normal}
+  .sub{color:var(--dim);font-size:13px;margin:6px 0 18px;line-height:1.65}
+  .sub b{color:var(--text)}
+  h2{font-size:14px;color:var(--gold);margin:26px 0 10px;font-weight:600}
+  .line{display:flex;gap:40px;align-items:flex-end;flex-wrap:wrap;padding:20px 24px;
+    background:#0d1322;border:1px solid #22304c;border-radius:12px}
+  .item{display:flex;flex-direction:column;align-items:center;gap:10px}
+  .cap{font-size:11.5px;color:var(--dim);text-align:center;line-height:1.6}
+  .cap b{color:var(--text);font-weight:600;display:block;font-size:12.5px}
+  .cap i{font-style:normal;color:#7f8fb0;font-size:11px}
+  .box{display:flex;align-items:flex-end;justify-content:center;min-height:190px}
+  .pair{display:flex;gap:22px;align-items:flex-end;padding:16px 20px;border-radius:10px;
+    background:#0b101d;border:1px solid #1e2a44}
+  table{border-collapse:collapse;margin-top:10px;font-size:12.5px;max-width:1040px}
+  th,td{border:1px solid #2a3550;padding:7px 11px;text-align:left;vertical-align:top}
+  th{background:#161d2c;color:var(--gold);font-weight:600}
+  code{background:#161d2c;padding:1px 5px;border-radius:3px;color:#cfe0ff;font-size:12px}
+</style>
+</head>
+<body>
+
+<h1>雪皇的后厨 · <em>炮筒：三种尺寸 × 喷火</em></h1>
+<p class="sub">
+  按你说的：<b>三种尺寸用同一个形状</b>，只是整体缩放 —— 所以任何尺寸下比例都一致（不会出现"大的那个握把变形"）。
+  每一档都给了<b>静止</b>和<b>喷火后</b>两种状态：火从筒口喷出、往上有三层火舌 + 一圈热光。
+  <br>SVG 里统一用 <code>viewBox="0 -100 160 300"</code>，我改的只是显示尺寸，形状坐标一处都不变。
+</p>
+
+<h2>一、静止 / 喷火 对照（大尺寸 220×275）</h2>
+<div class="line">
+  <div class="pair">
+    <div class="item">
+      <svg width="200" height="375" viewBox="0 -100 160 300">
+        <defs>
+          <linearGradient id="cone" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#f8e0b4"/><stop offset="45%" stop-color="#e0b072"/>
+            <stop offset="100%" stop-color="#a9762f"/></linearGradient>
+          <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#3d4a66"/><stop offset="100%" stop-color="#1b2233"/></linearGradient>
+        </defs>
+        <polygon points="80,186 28,24 132,24" fill="url(#cone)" stroke="#8a5c28" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M38 64 L122 56" stroke="#8a5c28" stroke-width="3" stroke-opacity=".5" stroke-linecap="round"/>
+        <path d="M44 100 L116 92" stroke="#8a5c28" stroke-width="3" stroke-opacity=".5" stroke-linecap="round"/>
+        <path d="M52 136 L108 128" stroke="#8a5c28" stroke-width="3" stroke-opacity=".5" stroke-linecap="round"/>
+        <rect x="30" y="2" width="100" height="26" rx="6" fill="url(#metal)" stroke="#4d5d82" stroke-width="1.5"/>
+        <path d="M42 15 H118" stroke="#6d80ab" stroke-width="4" stroke-dasharray="7 7" stroke-linecap="round"/>
+        <rect x="22" y="-14" width="116" height="20" rx="7" fill="#f2d7a6" stroke="#a9762f" stroke-width="2"/>
+        <rect x="40" y="-9" width="80" height="10" rx="5" fill="#5a3a1c"/>
+        <path d="M58 32 L52 148" stroke="#fff" stroke-opacity=".4" stroke-width="6" stroke-linecap="round"/>
+        <text x="80" y="199" fill="#93a3c4" font-size="9" text-anchor="middle">静止</text>
+      </svg>
+      <div class="cap"><b>静止</b><i>220 × 275</i></div>
+    </div>
+    <div class="item">
+      <svg width="200" height="375" viewBox="0 -100 160 300">
+        <ellipse cx="80" cy="-40" rx="40" ry="52" fill="#ff8a2b" opacity=".55"/>
+        <ellipse cx="80" cy="-42" rx="27" ry="42" fill="#ffb347" opacity=".9"/>
+        <ellipse cx="80" cy="-36" rx="17" ry="30" fill="#ffe9a8" opacity=".95"/>
+        <ellipse cx="80" cy="-30" rx="8" ry="18" fill="#fffdf0"/>
+        <polygon points="80,186 28,24 132,24" fill="url(#cone)" stroke="#8a5c28" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M38 64 L122 56" stroke="#8a5c28" stroke-width="3" stroke-opacity=".5" stroke-linecap="round"/>
+        <path d="M44 100 L116 92" stroke="#8a5c28" stroke-width="3" stroke-opacity=".5" stroke-linecap="round"/>
+        <path d="M52 136 L108 128" stroke="#8a5c28" stroke-width="3" stroke-opacity=".5" stroke-linecap="round"/>
+        <rect x="30" y="2" width="100" height="26" rx="6" fill="url(#metal)" stroke="#4d5d82" stroke-width="1.5"/>
+        <path d="M42 15 H118" stroke="#6d80ab" stroke-width="4" stroke-dasharray="7 7" stroke-linecap="round"/>
+        <rect x="22" y="-14" width="116" height="20" rx="7" fill="#ffd98f" stroke="#a9762f" stroke-width="2"/>
+        <rect x="40" y="-9" width="80" height="10" rx="5" fill="#ff8a2b"/>
+        <path d="M58 32 L52 148" stroke="#fff" stroke-opacity=".4" stroke-width="6" stroke-linecap="round"/>
+        <text x="80" y="199" fill="#93a3c4" font-size="9" text-anchor="middle">喷火</text>
+      </svg>
+      <div class="cap"><b>喷火（烤甜筒那一步）</b><i>筒口热光 + 三层火舌</i></div>
+    </div>
+  </div>
+  <div class="cap" style="max-width:330px;text-align:left">
+    <b>火怎么画的（千星里照这个叠）</b><i>
+    千星没有渐变，所以火舌用 <b>4 层椭圆从大到小错位叠</b>：
+    最外 40×52 橙（半透明）→ 27×42 亮橙 → 17×30 淡黄 → 8×18 米白。
+    再加一个 <b>横向椭圆做"热光"</b>（筒口那一圈发亮），静态时它是暗的，喷火时亮起来。</i>
+  </div>
+</div>
+
+<h2>二、三种尺寸（同一形状，只缩放）· 每档都给喷火</h2>
+<div class="line">
+
+  <!-- 小 -->
+  <div class="pair">
+    <div class="item">
+      <svg width="51" height="96" viewBox="0 -100 160 300">
+        <polygon points="80,186 28,24 132,24" fill="url(#cone)" stroke="#8a5c28" stroke-width="3" stroke-linejoin="round"/>
+        <path d="M38 64 L122 56" stroke="#8a5c28" stroke-width="7" stroke-opacity=".5" stroke-linecap="round"/>
+        <path d="M44 100 L116 92" stroke="#8a5c28" stroke-width="7" stroke-opacity=".5" stroke-linecap="round"/>
+        <rect x="30" y="2" width="100" height="26" rx="6" fill="url(#metal)"/>
+        <rect x="22" y="-14" width="116" height="20" rx="7" fill="#f2d7a6" stroke="#a9762f" stroke-width="3"/>
+        <rect x="40" y="-9" width="80" height="10" rx="5" fill="#5a3a1c"/>
+      </svg>
+      <div class="cap"><b>小</b><i>56 × 70</i></div>
+    </div>
+    <div class="item">
+      <svg width="51" height="96" viewBox="0 -100 160 300">
+        <ellipse cx="80" cy="-42" rx="34" ry="46" fill="#ffb347" opacity=".9"/>
+        <ellipse cx="80" cy="-36" rx="20" ry="32" fill="#ffe9a8"/>
+        <ellipse cx="80" cy="-30" rx="10" ry="18" fill="#fffdf0"/>
+        <polygon points="80,186 28,24 132,24" fill="url(#cone)" stroke="#8a5c28" stroke-width="3" stroke-linejoin="round"/>
+        <path d="M38 64 L122 56" stroke="#8a5c28" stroke-width="7" stroke-opacity=".5" stroke-linecap="round"/>
+        <path d="M44 100 L116 92" stroke="#8a5c28" stroke-width="7" stroke-opacity=".5" stroke-linecap="round"/>
+        <rect x="30" y="2" width="100" height="26" rx="6" fill="url(#metal)"/>
+        <rect x="22" y="-14" width="116" height="20" rx="7" fill="#ffd98f" stroke="#a9762f" stroke-width="3"/>
+      </svg>
+      <div class="cap"><b>小 · 喷火</b><i>56 × 70</i></div>
+    </div>
+  </div>
+
+  <!-- 中 -->
+  <div class="pair">
+    <div class="item">
+      <svg width="100" height="188" viewBox="0 -100 160 300">
+        <polygon points="80,186 28,24 132,24" fill="url(#cone)" stroke="#8a5c28" stroke-width="2.4" stroke-linejoin="round"/>
+        <path d="M38 64 L122 56" stroke="#8a5c28" stroke-width="4.5" stroke-opacity=".5" stroke-linecap="round"/>
+        <path d="M44 100 L116 92" stroke="#8a5c28" stroke-width="4.5" stroke-opacity=".5" stroke-linecap="round"/>
+        <path d="M52 136 L108 128" stroke="#8a5c28" stroke-width="4.5" stroke-opacity=".5" stroke-linecap="round"/>
+        <rect x="30" y="2" width="100" height="26" rx="6" fill="url(#metal)" stroke="#4d5d82" stroke-width="2"/>
+        <path d="M42 15 H118" stroke="#6d80ab" stroke-width="6" stroke-dasharray="10 10" stroke-linecap="round"/>
+        <rect x="22" y="-14" width="116" height="20" rx="7" fill="#f2d7a6" stroke="#a9762f" stroke-width="2.4"/>
+        <rect x="40" y="-9" width="80" height="10" rx="5" fill="#5a3a1c"/>
+        <path d="M58 32 L52 148" stroke="#fff" stroke-opacity=".38" stroke-width="8" stroke-linecap="round"/>
+      </svg>
+      <div class="cap"><b>中</b><i>110 × 138</i></div>
+    </div>
+    <div class="item">
+      <svg width="100" height="188" viewBox="0 -100 160 300">
+        <ellipse cx="80" cy="-44" rx="36" ry="50" fill="#ff8a2b" opacity=".5"/>
+        <ellipse cx="80" cy="-42" rx="25" ry="40" fill="#ffb347" opacity=".92"/>
+        <ellipse cx="80" cy="-36" rx="15" ry="28" fill="#ffe9a8"/>
+        <ellipse cx="80" cy="-30" rx="7" ry="16" fill="#fffdf0"/>
+        <polygon points="80,186 28,24 132,24" fill="url(#cone)" stroke="#8a5c28" stroke-width="2.4" stroke-linejoin="round"/>
+        <path d="M38 64 L122 56" stroke="#8a5c28" stroke-width="4.5" stroke-opacity=".5" stroke-linecap="round"/>
+        <path d="M44 100 L116 92" stroke="#8a5c28" stroke-width="4.5" stroke-opacity=".5" stroke-linecap="round"/>
+        <path d="M52 136 L108 128" stroke="#8a5c28" stroke-width="4.5" stroke-opacity=".5" stroke-linecap="round"/>
+        <rect x="30" y="2" width="100" height="26" rx="6" fill="url(#metal)" stroke="#4d5d82" stroke-width="2"/>
+        <path d="M42 15 H118" stroke="#6d80ab" stroke-width="6" stroke-dasharray="10 10" stroke-linecap="round"/>
+        <rect x="22" y="-14" width="116" height="20" rx="7" fill="#ffd98f" stroke="#a9762f" stroke-width="2.4"/>
+        <rect x="40" y="-9" width="80" height="10" rx="5" fill="#ff8a2b"/>
+        <path d="M58 32 L52 148" stroke="#fff" stroke-opacity=".38" stroke-width="8" stroke-linecap="round"/>
+      </svg>
+      <div class="cap"><b>中 · 喷火</b><i>110 × 138</i></div>
+    </div>
+  </div>
+
+  <!-- 大 -->
+  <div class="pair">
+    <div class="item">
+      <svg width="163" height="306" viewBox="0 -100 160 300">
+        <polygon points="80,186 28,24 132,24" fill="url(#cone)" stroke="#8a5c28" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M38 64 L122 56" stroke="#8a5c28" stroke-width="3" stroke-opacity=".5" stroke-linecap="round"/>
+        <path d="M44 100 L116 92" stroke="#8a5c28" stroke-width="3" stroke-opacity=".5" stroke-linecap="round"/>
+        <path d="M52 136 L108 128" stroke="#8a5c28" stroke-width="3" stroke-opacity=".5" stroke-linecap="round"/>
+        <rect x="30" y="2" width="100" height="26" rx="6" fill="url(#metal)" stroke="#4d5d82" stroke-width="1.5"/>
+        <path d="M42 15 H118" stroke="#6d80ab" stroke-width="4" stroke-dasharray="7 7" stroke-linecap="round"/>
+        <rect x="22" y="-14" width="116" height="20" rx="7" fill="#f2d7a6" stroke="#a9762f" stroke-width="2"/>
+        <rect x="40" y="-9" width="80" height="10" rx="5" fill="#5a3a1c"/>
+        <path d="M58 32 L52 148" stroke="#fff" stroke-opacity=".4" stroke-width="6" stroke-linecap="round"/>
+      </svg>
+      <div class="cap"><b>大</b><i>180 × 225</i></div>
+    </div>
+    <div class="item">
+      <svg width="163" height="306" viewBox="0 -100 160 300">
+        <ellipse cx="80" cy="-40" rx="40" ry="52" fill="#ff8a2b" opacity=".55"/>
+        <ellipse cx="80" cy="-42" rx="27" ry="42" fill="#ffb347" opacity=".9"/>
+        <ellipse cx="80" cy="-36" rx="17" ry="30" fill="#ffe9a8" opacity=".95"/>
+        <ellipse cx="80" cy="-30" rx="8" ry="18" fill="#fffdf0"/>
+        <polygon points="80,186 28,24 132,24" fill="url(#cone)" stroke="#8a5c28" stroke-width="2" stroke-linejoin="round"/>
+        <path d="M38 64 L122 56" stroke="#8a5c28" stroke-width="3" stroke-opacity=".5" stroke-linecap="round"/>
+        <path d="M44 100 L116 92" stroke="#8a5c28" stroke-width="3" stroke-opacity=".5" stroke-linecap="round"/>
+        <path d="M52 136 L108 128" stroke="#8a5c28" stroke-width="3" stroke-opacity=".5" stroke-linecap="round"/>
+        <rect x="30" y="2" width="100" height="26" rx="6" fill="url(#metal)" stroke="#4d5d82" stroke-width="1.5"/>
+        <path d="M42 15 H118" stroke="#6d80ab" stroke-width="4" stroke-dasharray="7 7" stroke-linecap="round"/>
+        <rect x="22" y="-14" width="116" height="20" rx="7" fill="#ffd98f" stroke="#a9762f" stroke-width="2"/>
+        <rect x="40" y="-9" width="80" height="10" rx="5" fill="#ff8a2b"/>
+        <path d="M58 32 L52 148" stroke="#fff" stroke-opacity=".4" stroke-width="6" stroke-linecap="round"/>
+      </svg>
+      <div class="cap"><b>大 · 喷火</b><i>180 × 225</i></div>
+    </div>
+  </div>
+</div>
+
+<h2>三、尺寸表（同一形状，只改显示尺寸）</h2>
+<table>
+  <tr><th>档</th><th>显示尺寸</th><th>用在哪</th></tr>
+  <tr><td>小</td><td><b>56 × 70</b></td><td>小票 / 角落 / 缩略</td></tr>
+  <tr><td>中</td><td><b>110 × 138</b></td><td>工位卡内的默认尺寸（推荐）</td></tr>
+  <tr><td>大</td><td><b>180 × 225</b></td><td>大舞台 / 演出高潮（喷火在这一档最带感）</td></tr>
+  <tr><td>（超大演示）</td><td>220 × 275</td><td>只用于演示；实际游戏里不用这么大</td></tr>
+</table>
+
+<p class="sub" style="margin-top:16px">
+  千星里的做法：<b>三档共用同一套控件</b>，只改每个控件的 <code>sizeDelta</code> 和位置 —— 比例一定不会走形。
+  火舌是 4 个椭圆控件（<code>100002</code> 圆）+ 1 个横向椭圆做筒口热光；喷火时把它们 <code>SetVisible(true)</code> 并做缩放补间，静止时隐藏。
+</p>
+
+</body>
+</html>

@@ -1,0 +1,586 @@
+{
+ "canvas": {
+  "w": 1280,
+  "h": 720
+ },
+ "script": "out\\xuehuang.lua",
+ "frames": 90,
+ "controls": [
+  {
+   "kind": "ClientUIContainerControl",
+   "name": "Canvas",
+   "x": 0,
+   "y": 0,
+   "w": 0,
+   "h": 0,
+   "visible": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "Img",
+   "x": 0,
+   "y": 0,
+   "w": 0,
+   "h": 0,
+   "color": 4294967295,
+   "visible": false
+  },
+  {
+   "kind": "ClientUITextBoxControl",
+   "name": "Text",
+   "text": "",
+   "x": 0,
+   "y": 0,
+   "w": 0,
+   "h": 0,
+   "visible": true
+  },
+  {
+   "kind": "ClientUICursorEventAreaControl",
+   "name": "CursorArea",
+   "x": 0,
+   "y": 0,
+   "w": 0,
+   "h": 0,
+   "visible": true
+  },
+  {
+   "kind": "ClientUIContainerControl",
+   "name": "Panel",
+   "x": 0,
+   "y": 0,
+   "w": 0,
+   "h": 0,
+   "visible": true
+  },
+  {
+   "kind": "ClientUIContainerControl",
+   "name": "Playfield",
+   "x": 0,
+   "y": 0,
+   "w": 0,
+   "h": 0,
+   "visible": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "St_shake",
+   "x": -290,
+   "y": 60,
+   "w": 236,
+   "h": 96,
+   "color": 3357418030,
+   "visible": true
+  },
+  {
+   "kind": "ClientUITextBoxControl",
+   "name": "StLab_shake",
+   "text": "     (B)",
+   "x": -290,
+   "y": 126,
+   "w": 260,
+   "h": 28,
+   "visible": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "St_fire",
+   "x": -40,
+   "y": 60,
+   "w": 236,
+   "h": 96,
+   "color": 3357418030,
+   "visible": true
+  },
+  {
+   "kind": "ClientUITextBoxControl",
+   "name": "StLab_fire",
+   "text": "     (H)",
+   "x": -40,
+   "y": 126,
+   "w": 260,
+   "h": 28,
+   "visible": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "St_chem",
+   "x": -290,
+   "y": -60,
+   "w": 236,
+   "h": 96,
+   "color": 3357418030,
+   "visible": true
+  },
+  {
+   "kind": "ClientUITextBoxControl",
+   "name": "StLab_chem",
+   "text": "     (C)",
+   "x": -290,
+   "y": 6,
+   "w": 260,
+   "h": 28,
+   "visible": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "St_brew",
+   "x": -40,
+   "y": -60,
+   "w": 236,
+   "h": 96,
+   "color": 3357418030,
+   "visible": true
+  },
+  {
+   "kind": "ClientUITextBoxControl",
+   "name": "StLab_brew",
+   "text": "     (P)",
+   "x": -40,
+   "y": 6,
+   "w": 260,
+   "h": 28,
+   "visible": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "St_pack",
+   "x": -165,
+   "y": -210,
+   "w": 900,
+   "h": 64,
+   "color": 3357418030,
+   "visible": true
+  },
+  {
+   "kind": "ClientUITextBoxControl",
+   "name": "StLab_pack",
+   "text": "     (  )        0  ",
+   "x": -165,
+   "y": -210,
+   "w": 880,
+   "h": 30,
+   "visible": true
+  },
+  {
+   "kind": "ClientUITextBoxControl",
+   "name": "HudTitle",
+   "text": "     ",
+   "x": -290,
+   "y": 316,
+   "w": 460,
+   "h": 30,
+   "visible": true
+  },
+  {
+   "kind": "ClientUITextBoxControl",
+   "name": "HudClock",
+   "text": "  1/5     02:00      10:00",
+   "x": -60,
+   "y": 316,
+   "w": 460,
+   "h": 30,
+   "visible": true
+  },
+  {
+   "kind": "ClientUITextBoxControl",
+   "name": "HudStats",
+   "text": "  0      0      0      0      0      0/3      0",
+   "x": -290,
+   "y": 288,
+   "w": 920,
+   "h": 26,
+   "visible": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "Tk_1",
+   "x": -560,
+   "y": -290,
+   "w": 152,
+   "h": 92,
+   "color": 4294967295,
+   "visible": false
+  },
+  {
+   "kind": "ClientUITextBoxControl",
+   "name": "TkT_1",
+   "text": "",
+   "x": -560,
+   "y": -290,
+   "w": 144,
+   "h": 76,
+   "visible": false
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "Tk_2",
+   "x": -395,
+   "y": -290,
+   "w": 152,
+   "h": 92,
+   "color": 4294967295,
+   "visible": false
+  },
+  {
+   "kind": "ClientUITextBoxControl",
+   "name": "TkT_2",
+   "text": "",
+   "x": -395,
+   "y": -290,
+   "w": 144,
+   "h": 76,
+   "visible": false
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "Tk_3",
+   "x": -230,
+   "y": -290,
+   "w": 152,
+   "h": 92,
+   "color": 4294967295,
+   "visible": false
+  },
+  {
+   "kind": "ClientUITextBoxControl",
+   "name": "TkT_3",
+   "text": "",
+   "x": -230,
+   "y": -290,
+   "w": 144,
+   "h": 76,
+   "visible": false
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "Tk_4",
+   "x": -65,
+   "y": -290,
+   "w": 152,
+   "h": 92,
+   "color": 4294967295,
+   "visible": false
+  },
+  {
+   "kind": "ClientUITextBoxControl",
+   "name": "TkT_4",
+   "text": "",
+   "x": -65,
+   "y": -290,
+   "w": 144,
+   "h": 76,
+   "visible": false
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "Tk_5",
+   "x": 100,
+   "y": -290,
+   "w": 152,
+   "h": 92,
+   "color": 4294967295,
+   "visible": false
+  },
+  {
+   "kind": "ClientUITextBoxControl",
+   "name": "TkT_5",
+   "text": "",
+   "x": 100,
+   "y": -290,
+   "w": 144,
+   "h": 76,
+   "visible": false
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "Tk_6",
+   "x": 265,
+   "y": -290,
+   "w": 152,
+   "h": 92,
+   "color": 4294967295,
+   "visible": false
+  },
+  {
+   "kind": "ClientUITextBoxControl",
+   "name": "TkT_6",
+   "text": "",
+   "x": 265,
+   "y": -290,
+   "w": 144,
+   "h": 76,
+   "visible": false
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "OrderPanel",
+   "x": 460,
+   "y": 40,
+   "w": 300,
+   "h": 620,
+   "color": 3944357934,
+   "visible": true
+  },
+  {
+   "kind": "ClientUITextBoxControl",
+   "name": "OrderHead",
+   "text": "    /   ",
+   "x": 460,
+   "y": 330,
+   "w": 290,
+   "h": 26,
+   "visible": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "Od_1",
+   "x": 460,
+   "y": 240,
+   "w": 288,
+   "h": 88,
+   "color": 4294967295,
+   "visible": false
+  },
+  {
+   "kind": "ClientUITextBoxControl",
+   "name": "OdW_1",
+   "text": "",
+   "x": 460,
+   "y": 266,
+   "w": 276,
+   "h": 24,
+   "visible": false
+  },
+  {
+   "kind": "ClientUITextBoxControl",
+   "name": "OdT_1",
+   "text": "",
+   "x": 460,
+   "y": 242,
+   "w": 276,
+   "h": 22,
+   "visible": false
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "OdB_1",
+   "x": 460,
+   "y": 210,
+   "w": 272,
+   "h": 10,
+   "color": 3944094244,
+   "visible": false
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "OdF_1",
+   "x": 460,
+   "y": 210,
+   "w": 272,
+   "h": 10,
+   "color": 4285981334,
+   "visible": false
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "Od_2",
+   "x": 460,
+   "y": 144,
+   "w": 288,
+   "h": 88,
+   "color": 4294967295,
+   "visible": false
+  },
+  {
+   "kind": "ClientUITextBoxControl",
+   "name": "OdW_2",
+   "text": "",
+   "x": 460,
+   "y": 170,
+   "w": 276,
+   "h": 24,
+   "visible": false
+  },
+  {
+   "kind": "ClientUITextBoxControl",
+   "name": "OdT_2",
+   "text": "",
+   "x": 460,
+   "y": 146,
+   "w": 276,
+   "h": 22,
+   "visible": false
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "OdB_2",
+   "x": 460,
+   "y": 114,
+   "w": 272,
+   "h": 10,
+   "color": 3944094244,
+   "visible": false
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "OdF_2",
+   "x": 460,
+   "y": 114,
+   "w": 272,
+   "h": 10,
+   "color": 4285981334,
+   "visible": false
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "Od_3",
+   "x": 460,
+   "y": 48,
+   "w": 288,
+   "h": 88,
+   "color": 4294967295,
+   "visible": false
+  },
+  {
+   "kind": "ClientUITextBoxControl",
+   "name": "OdW_3",
+   "text": "",
+   "x": 460,
+   "y": 74,
+   "w": 276,
+   "h": 24,
+   "visible": false
+  },
+  {
+   "kind": "ClientUITextBoxControl",
+   "name": "OdT_3",
+   "text": "",
+   "x": 460,
+   "y": 50,
+   "w": 276,
+   "h": 22,
+   "visible": false
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "OdB_3",
+   "x": 460,
+   "y": 18,
+   "w": 272,
+   "h": 10,
+   "color": 3944094244,
+   "visible": false
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "OdF_3",
+   "x": 460,
+   "y": 18,
+   "w": 272,
+   "h": 10,
+   "color": 4285981334,
+   "visible": false
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "Od_4",
+   "x": 460,
+   "y": -48,
+   "w": 288,
+   "h": 88,
+   "color": 4294967295,
+   "visible": false
+  },
+  {
+   "kind": "ClientUITextBoxControl",
+   "name": "OdW_4",
+   "text": "",
+   "x": 460,
+   "y": -22,
+   "w": 276,
+   "h": 24,
+   "visible": false
+  },
+  {
+   "kind": "ClientUITextBoxControl",
+   "name": "OdT_4",
+   "text": "",
+   "x": 460,
+   "y": -46,
+   "w": 276,
+   "h": 22,
+   "visible": false
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "OdB_4",
+   "x": 460,
+   "y": -78,
+   "w": 272,
+   "h": 10,
+   "color": 3944094244,
+   "visible": false
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "OdF_4",
+   "x": 460,
+   "y": -78,
+   "w": 272,
+   "h": 10,
+   "color": 4285981334,
+   "visible": false
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "Od_5",
+   "x": 460,
+   "y": -144,
+   "w": 288,
+   "h": 88,
+   "color": 4294967295,
+   "visible": false
+  },
+  {
+   "kind": "ClientUITextBoxControl",
+   "name": "OdW_5",
+   "text": "",
+   "x": 460,
+   "y": -118,
+   "w": 276,
+   "h": 24,
+   "visible": false
+  },
+  {
+   "kind": "ClientUITextBoxControl",
+   "name": "OdT_5",
+   "text": "",
+   "x": 460,
+   "y": -142,
+   "w": 276,
+   "h": 22,
+   "visible": false
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "OdB_5",
+   "x": 460,
+   "y": -174,
+   "w": 272,
+   "h": 10,
+   "color": 3944094244,
+   "visible": false
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "OdF_5",
+   "x": 460,
+   "y": -174,
+   "w": 272,
+   "h": 10,
+   "color": 4285981334,
+   "visible": false
+  }
+ ]
+}

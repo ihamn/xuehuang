@@ -1,0 +1,1168 @@
+{
+ "canvas": {
+  "w": 1280,
+  "h": 720
+ },
+ "script": "dist\\cup_tri_demo.lua",
+ "frames": 3,
+ "controls": [
+  {
+   "kind": "ClientUIContainerControl",
+   "name": "Canvas",
+   "x": 0,
+   "y": 0,
+   "depth": 0,
+   "w": 0,
+   "h": 0,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "T_triBody",
+   "x": -300,
+   "y": 68.0154535398993,
+   "depth": 1,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 108,
+   "h": 156.0309070797986,
+   "color": 1860235519,
+   "visible": true,
+   "rot": 180,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "T_mask",
+   "x": -300,
+   "y": -57.0154535398993,
+   "depth": 1,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 148,
+   "h": 96.0309070797986,
+   "color": 4278849048,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "B_cup",
+   "x": 260,
+   "y": 40,
+   "depth": 1,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 100,
+   "h": 108,
+   "color": 0,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupBody1",
+   "x": 260,
+   "y": -12.4375,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 69.69803929134616,
+   "h": 3.725,
+   "color": 1323364607,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupBody2",
+   "x": 260,
+   "y": -9.3125,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 70.6600062979701,
+   "h": 3.725,
+   "color": 1323364607,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupBody3",
+   "x": 260,
+   "y": -6.1875,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 71.62197330459404,
+   "h": 3.725,
+   "color": 1323364607,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupBody4",
+   "x": 260,
+   "y": -3.0625,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 72.58394031121796,
+   "h": 3.725,
+   "color": 1323364607,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupBody5",
+   "x": 260,
+   "y": 0.0625,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 73.5459073178419,
+   "h": 3.725,
+   "color": 1323364607,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupBody6",
+   "x": 260,
+   "y": 3.1875,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 74.50787432446582,
+   "h": 3.725,
+   "color": 1323364607,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupBody7",
+   "x": 260,
+   "y": 6.3125,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 75.46984133108975,
+   "h": 3.725,
+   "color": 1323364607,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupBody8",
+   "x": 260,
+   "y": 9.4375,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 76.43180833771369,
+   "h": 3.725,
+   "color": 1323364607,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupBody9",
+   "x": 260,
+   "y": 12.5625,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 77.39377534433761,
+   "h": 3.725,
+   "color": 1323364607,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupBody10",
+   "x": 260,
+   "y": 15.6875,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 78.35574235096155,
+   "h": 3.725,
+   "color": 1323364607,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupBody11",
+   "x": 260,
+   "y": 18.8125,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 79.31770935758547,
+   "h": 3.725,
+   "color": 1323364607,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupBody12",
+   "x": 260,
+   "y": 21.9375,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 80.27967636420941,
+   "h": 3.725,
+   "color": 1323364607,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupBody13",
+   "x": 260,
+   "y": 25.0625,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 81.24164337083334,
+   "h": 3.725,
+   "color": 1323364607,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupBody14",
+   "x": 260,
+   "y": 28.1875,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 82.20361037745727,
+   "h": 3.725,
+   "color": 1323364607,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupBody15",
+   "x": 260,
+   "y": 31.3125,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 83.1655773840812,
+   "h": 3.725,
+   "color": 1323364607,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupBody16",
+   "x": 260,
+   "y": 34.4375,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 84.12754439070514,
+   "h": 3.725,
+   "color": 1323364607,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupBody17",
+   "x": 260,
+   "y": 37.5625,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 85.08951139732906,
+   "h": 3.725,
+   "color": 1323364607,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupBody18",
+   "x": 260,
+   "y": 40.6875,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 86.051478403953,
+   "h": 3.725,
+   "color": 1323364607,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupBody19",
+   "x": 260,
+   "y": 43.8125,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 87.01344541057694,
+   "h": 3.725,
+   "color": 1323364607,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupBody20",
+   "x": 260,
+   "y": 46.9375,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 87.97541241720086,
+   "h": 3.725,
+   "color": 1323364607,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupBody21",
+   "x": 260,
+   "y": 50.0625,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 88.9373794238248,
+   "h": 3.725,
+   "color": 1323364607,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupBody22",
+   "x": 260,
+   "y": 53.1875,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 89.89934643044873,
+   "h": 3.725,
+   "color": 1323364607,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupBody23",
+   "x": 260,
+   "y": 56.3125,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 90.86131343707265,
+   "h": 3.725,
+   "color": 1323364607,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupBody24",
+   "x": 260,
+   "y": 59.4375,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 91.82328044369659,
+   "h": 3.725,
+   "color": 1323364607,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupBody25",
+   "x": 260,
+   "y": 62.5625,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 92.78524745032051,
+   "h": 3.725,
+   "color": 1323364607,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupBody26",
+   "x": 260,
+   "y": 65.6875,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 93.74721445694445,
+   "h": 3.725,
+   "color": 1323364607,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupBody27",
+   "x": 260,
+   "y": 68.8125,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 94.70918146356837,
+   "h": 3.725,
+   "color": 1323364607,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupBody28",
+   "x": 260,
+   "y": 71.9375,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 95.6711484701923,
+   "h": 3.725,
+   "color": 1323364607,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupBody29",
+   "x": 260,
+   "y": 75.0625,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 96.63311547681624,
+   "h": 3.725,
+   "color": 1323364607,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupBody30",
+   "x": 260,
+   "y": 78.1875,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 97.59508248344017,
+   "h": 3.725,
+   "color": 1323364607,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupBody31",
+   "x": 260,
+   "y": 81.3125,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 98.5570494900641,
+   "h": 3.725,
+   "color": 1323364607,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupBody32",
+   "x": 260,
+   "y": 84.4375,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 99.51901649668804,
+   "h": 3.725,
+   "color": 1323364607,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupWallL",
+   "x": 217.69573605299144,
+   "y": 36,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 3,
+   "h": 100,
+   "color": 3538088703,
+   "visible": true,
+   "rot": -8.75,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupWallR",
+   "x": 302.30426394700856,
+   "y": 36,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 3,
+   "h": 100,
+   "color": 3538088703,
+   "visible": true,
+   "rot": 8.75,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupLiq1",
+   "x": 260,
+   "y": -10.875,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 64.17902279465814,
+   "h": 6.85,
+   "color": 4042306628,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupLiq2",
+   "x": 260,
+   "y": -4.625,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 66.102956807906,
+   "h": 6.85,
+   "color": 4042306628,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupLiq3",
+   "x": 260,
+   "y": 1.625,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 68.02689082115386,
+   "h": 6.85,
+   "color": 4042306628,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupLiq4",
+   "x": 260,
+   "y": 7.875,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 69.95082483440171,
+   "h": 6.85,
+   "color": 4042306628,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupLiq5",
+   "x": 260,
+   "y": 14.125,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 71.87475884764959,
+   "h": 6.85,
+   "color": 4042306628,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupLiq6",
+   "x": 260,
+   "y": 20.375,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 73.79869286089745,
+   "h": 6.85,
+   "color": 4042306628,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupLiq7",
+   "x": 260,
+   "y": 26.625,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 75.7226268741453,
+   "h": 6.85,
+   "color": 4042306628,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupLiq8",
+   "x": 260,
+   "y": 32.875,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 77.64656088739316,
+   "h": 6.85,
+   "color": 4042306628,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupLiq9",
+   "x": 260,
+   "y": 39.125,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 79.57049490064102,
+   "h": 6.85,
+   "color": 4042306628,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupLiq10",
+   "x": 260,
+   "y": 44.12500000000001,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 81.10964211123932,
+   "h": 4.349999999999998,
+   "color": 4042306628,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupLiq11",
+   "x": 260,
+   "y": 40,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 0,
+   "h": 0,
+   "color": 4042306628,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupLiq12",
+   "x": 260,
+   "y": 40,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 0,
+   "h": 0,
+   "color": 4042306628,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupLiq13",
+   "x": 260,
+   "y": 40,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 0,
+   "h": 0,
+   "color": 4042306628,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupLiq14",
+   "x": 260,
+   "y": 40,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 0,
+   "h": 0,
+   "color": 4042306628,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupLiq15",
+   "x": 260,
+   "y": 40,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 0,
+   "h": 0,
+   "color": 4042306628,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupLiq16",
+   "x": 260,
+   "y": 40,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 0,
+   "h": 0,
+   "color": 4042306628,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupLiqTop",
+   "x": 260,
+   "y": 46,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 81.68682231521367,
+   "h": 2,
+   "color": 2197815295,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupLip",
+   "x": 260,
+   "y": 90,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 104,
+   "h": 8,
+   "color": 4293587967,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "CupShine",
+   "x": 218.4653096582906,
+   "y": 36,
+   "depth": 2,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 4,
+   "h": 90,
+   "color": 2533359615,
+   "visible": true,
+   "rot": 8.75,
+   "active": true
+  },
+  {
+   "kind": "ClientUITextBoxControl",
+   "name": "L三角",
+   "text": "三角+遮挡（用户思路）",
+   "x": -300,
+   "y": 150,
+   "depth": 1,
+   "w": 460,
+   "h": 30,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUITextBoxControl",
+   "name": "L叠条",
+   "text": "叠条法（32 条）",
+   "x": 260,
+   "y": 150,
+   "depth": 1,
+   "w": 460,
+   "h": 30,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  }
+ ]
+}

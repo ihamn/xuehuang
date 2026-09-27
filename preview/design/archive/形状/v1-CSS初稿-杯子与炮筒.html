@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>雪皇的后厨 · 实物：杯子 / 炮筒</title>
+<style>
+  :root{ --text:#EEF3FC; --dim:#93a3c4; --gold:#FFD682; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#0a0c12;color:var(--text);font-family:"Microsoft YaHei","PingFang SC",sans-serif;padding:26px 30px 60px}
+  h1{font-size:20px;font-weight:600} h1 em{color:var(--gold);font-style:normal}
+  .sub{color:var(--dim);font-size:13px;margin:6px 0 22px}
+  h2{font-size:14px;color:var(--gold);margin:26px 0 10px;font-weight:600}
+  .line{display:flex;gap:46px;align-items:flex-end;flex-wrap:wrap;padding:18px 20px;
+    background:#0e1424;border:1px solid #23304c;border-radius:12px}
+  .item{display:flex;flex-direction:column;align-items:center;gap:8px}
+  .cap{font-size:11px;color:var(--dim);text-align:center;line-height:1.5}
+  .cap b{color:var(--text);font-weight:600}
+
+  /* ══════ 杯子（锥形杯：上宽下窄，与原版"饮料杯"一致）══════
+     画法对应千星里的控件组合：
+       杯身 = 梯形（用两块圆角矩形错位叠，或用基础形状旋转 90° 的方块做侧边）
+       液体 = 梯形（同法，高度随进度）  杯口 = 一条圆角矩形  高光 = 细长矩形 */
+  .cup{position:relative; width:76px; height:104px}
+  .cup .body{
+    position:absolute; inset:0;
+    background:linear-gradient(180deg,rgba(255,255,255,.34),rgba(255,255,255,.10) 55%,rgba(255,255,255,.22));
+    clip-path:polygon(2% 0%, 98% 0%, 87% 96%, 13% 96%);
+    border-radius:5px;
+  }
+  .cup .rim{
+    position:absolute; left:0; right:0; top:-4px; height:9px; border-radius:6px;
+    background:linear-gradient(180deg,#ffffff,#cfe0f5); opacity:.95;
+  }
+  .cup .liq{
+    position:absolute; left:0; right:0; bottom:4%; height:0%;
+    background:linear-gradient(180deg,#d8ecff,#79bdee);
+    clip-path:polygon(2% 0%, 98% 0%, 87% 100%, 13% 100%);
+    transition:height .12s linear;
+  }
+  .cup .liq.v2{background:linear-gradient(180deg,#ffe7c2,#f0a94e)}
+  .cup .liq.v3{background:linear-gradient(180deg,#e8d6ff,#a97fe0)}
+  .cup .liq.v4{background:linear-gradient(180deg,#d6ffe9,#4fbe86)}
+  .cup .shine{
+    position:absolute; left:14%; top:8%; width:9px; height:64%; border-radius:5px;
+    background:linear-gradient(180deg,rgba(255,255,255,.75),rgba(255,255,255,.05));
+  }
+  .cup .edgeL,.cup .edgeR{position:absolute; bottom:4%; width:3px; height:92%;
+    background:rgba(255,255,255,.5); border-radius:2px}
+  .cup .edgeL{left:8%; transform:rotate(3.4deg)} .cup .edgeR{right:8%; transform:rotate(-3.4deg)}
+  .cup.s{width:46px;height:64px} .cup.s .shine{width:6px}
+  .cup.l{width:104px;height:142px} .cup.l .shine{width:12px}
+  .cup .lvl{position:absolute; left:50%; top:-24px; transform:translateX(-50%); font-size:11px; color:var(--dim)}
+
+  /* ══════ 锥形"炮筒"（甜筒形状：锥尖朝下，上面是筒口）
+     画法：锥体用 clip-path 三角形；口沿一条圆角矩形；螺纹用 2~3 条斜细矩形叠出来 */
+  .cone{position:relative; width:84px; height:118px}
+  .cone .shaft{
+    position:absolute; inset:0;
+    background:linear-gradient(100deg,#f6d9a8,#dda85f 45%,#b9803c);
+    clip-path:polygon(50% 100%, 0% 8%, 100% 8%);
+  }
+  .cone .mouth{
+    position:absolute; left:2px; right:2px; top:0; height:16px; border-radius:4px 4px 7px 7px;
+    background:linear-gradient(180deg,#fff0cf,#c89250);
+  }
+  .cone .mouth:after{ /* 筒口内壁（深色） */
+    content:""; position:absolute; left:12%; right:12%; top:5px; height:7px; border-radius:4px;
+    background:#5a3a1c; opacity:.9;
+  }
+  .cone .grip{
+    position:absolute; left:50%; top:14px; transform:translateX(-50%);
+    width:56px; height:13px; border-radius:4px; background:linear-gradient(180deg,#2f3a52,#1b2334);
+    border:1px solid #46557a;
+  }
+  .cone .grip:after{content:""; position:absolute; left:6px; right:6px; top:4px; height:3px;
+    border-radius:2px; background:repeating-linear-gradient(90deg,#5d6d92 0 6px,transparent 6px 12px)}
+  .cone .screw{position:absolute; left:12%; right:12%; height:3px; border-radius:2px;
+    background:rgba(90,58,28,.55)}
+  .cone .screw.a{top:38px; transform:rotate(-2.5deg)}
+  .cone .screw.b{top:58px; transform:rotate(2.5deg)}
+  .cone .screw.c{top:78px; transform:rotate(-2.5deg)}
+  .cone .tip{position:absolute; left:50%; bottom:-6px; transform:translateX(-50%);
+    width:8px; height:10px; border-radius:2px; background:#8a5c28}
+  .cone .shinec{position:absolute; left:26%; top:16%; width:8px; height:56%; border-radius:6px;
+    background:linear-gradient(180deg,rgba(255,255,255,.6),rgba(255,255,255,.02)); transform:rotate(4deg)}
+  .cone .fire{position:absolute; left:50%; top:-42px; margin-left:-16px; width:32px; height:40px;
+    background:radial-gradient(circle at 50% 80%,#fff6c0,#ffa13c 46%,rgba(255,90,0,0) 72%);
+    border-radius:50% 50% 42% 42%}
+  .cone.s{width:52px;height:74px} .cone.l{width:120px;height:168px}
+
+  table{border-collapse:collapse;margin-top:12px;font-size:12.5px;max-width:1000px}
+  th,td{border:1px solid #2a3550;padding:7px 11px;text-align:left;vertical-align:top}
+  th{background:#161d2c;color:var(--gold);font-weight:600}
+  code{background:#161d2c;padding:1px 5px;border-radius:3px;color:#cfe0ff;font-size:12px}
+</style>
+</head>
+<body>
+
+<h1>雪皇的后厨 · <em>实物：杯子 / 锥形炮筒</em></h1>
+<p class="sub">先定这两个"东西"长什么样。它们是后面所有演出的主角 —— 摇的是这个杯子、砸的是这个杯子、<b>炮筒</b>是甜筒那一道工序里"掏出来的那个筒"。<br>
+大中小三档是为了对齐千星里能用到的尺寸（工位卡内 / 大舞台 / 缩略）。</p>
+
+<h2>一、杯子（锥形饮料杯）</h2>
+<p class="sub" style="margin:0 0 10px">上宽下窄、杯口有一圈亮边、左侧一道高光；液体是梯形，<b>液面高度 = 这一步的进度</b>。<br>
+下面四个是同形状的四种内容物：清水 / 茶汤（琥珀）/ 溴水（紫）/ 四季春（绿）。</p>
+<div class="line">
+  <div class="item">
+    <div class="cup"><div class="body"></div><div class="liq" style="height:54%"></div>
+      <div class="edgeL"></div><div class="edgeR"></div><div class="shine"></div><div class="rim"></div>
+      <div class="lvl">清水</div></div>
+    <div class="cap"><b>大</b><br>104 × 142</div>
+  </div>
+  <div class="item">
+    <div class="cup"><div class="body"></div><div class="liq v2" style="height:46%"></div>
+      <div class="edgeL"></div><div class="edgeR"></div><div class="shine"></div><div class="rim"></div>
+      <div class="lvl">茶汤</div></div>
+    <div class="cap"><b>大</b><br>琥珀色</div>
+  </div>
+  <div class="item">
+    <div class="cup"><div class="body"></div><div class="liq v3" style="height:62%"></div>
+      <div class="edgeL"></div><div class="edgeR"></div><div class="shine"></div><div class="rim"></div>
+      <div class="lvl">溴水</div></div>
+    <div class="cap"><b>大</b><br>紫色</div>
+  </div>
+  <div class="item">
+    <div class="cup"><div class="body"></div><div class="liq v4" style="height:38%"></div>
+      <div class="edgeL"></div><div class="edgeR"></div><div class="shine"></div><div class="rim"></div>
+      <div class="lvl">四季春</div></div>
+    <div class="cap"><b>大</b><br>青绿</div>
+  </div>
+  <div class="item">
+    <div class="cup" style="width:76px;height:104px"><div class="body"></div><div class="liq" style="height:70%"></div>
+      <div class="edgeL"></div><div class="edgeR"></div><div class="shine"></div><div class="rim"></div></div>
+    <div class="cap"><b>中</b><br>76 × 104（工位卡内用这个）</div>
+  </div>
+  <div class="item">
+    <div class="cup s"><div class="body"></div><div class="liq" style="height:60%"></div>
+      <div class="edgeL"></div><div class="edgeR"></div><div class="shine"></div><div class="rim"></div></div>
+    <div class="cap"><b>小</b><br>46 × 64（小票/角落）</div>
+  </div>
+</div>
+
+<h2>二、锥形"炮筒"</h2>
+<p class="sub" style="margin:0 0 10px">锥尖朝下、筒口朝上；筒口有一圈金属沿、中间是深色内壁；<br>
+握把是深色带刻纹的一段（"掏出来握在手里"的那截）；锥体上有斜向螺纹。右侧那个是<b>点火状态</b>（从筒口喷火）。</p>
+<div class="line">
+  <div class="item">
+    <div class="cone"><div class="shaft"></div>
+      <div class="screw a"></div><div class="screw b"></div><div class="screw c"></div>
+      <div class="grip"></div><div class="shinec"></div><div class="mouth"></div><div class="tip"></div></div>
+    <div class="cap"><b>中</b><br>84 × 118（默认）</div>
+  </div>
+  <div class="item">
+    <div class="cone"><div class="shaft"></div>
+      <div class="screw a"></div><div class="screw b"></div><div class="screw c"></div>
+      <div class="grip"></div><div class="shinec"></div><div class="mouth"></div><div class="tip"></div>
+      <div class="fire"></div></div>
+    <div class="cap"><b>点火状态</b><br>筒口喷火（烤甜筒那一步）</div>
+  </div>
+  <div class="item">
+    <div class="cone l"><div class="shaft"></div>
+      <div class="screw a" style="top:54px"></div><div class="screw b" style="top:82px"></div>
+      <div class="screw c" style="top:110px"></div>
+      <div class="grip" style="top:20px;width:80px;height:18px"></div>
+      <div class="shinec"></div><div class="mouth" style="height:22px"></div><div class="tip"></div></div>
+    <div class="cap"><b>大</b><br>120 × 168（大舞台）</div>
+  </div>
+  <div class="item">
+    <div class="cone s"><div class="shaft"></div>
+      <div class="screw a" style="top:24px"></div><div class="screw b" style="top:36px"></div>
+      <div class="grip" style="top:9px;width:34px;height:8px"></div>
+      <div class="mouth" style="height:10px"></div></div>
+    <div class="cap"><b>小</b><br>52 × 74（小票/角落）</div>
+  </div>
+</div>
+
+<h2>三、这两个东西怎么在千星里拼出来</h2>
+<p class="sub" style="margin:0 0 6px">素材库里**没有**杯子/炮筒的现成图，所以用基础形状拼。下面是每一块的对应关系（改的时候按这张表改）：</p>
+<table>
+  <tr><th>部件</th><th>千星里用什么</th><th>关键点</th></tr>
+  <tr><td>杯身（梯形）</td><td>基础形状 <code>100001</code> 方块，用两块侧边条旋转出收口；或直接用一个方块拉成杯身再叠两条斜边</td><td>方块**拉伸不糊**，适合做梯形侧边</td></tr>
+  <tr><td>杯口亮边</td><td><code>100001</code> 细长条（横向）</td><td>比杯身亮一档，宽度略大于杯口</td></tr>
+  <tr><td>液体</td><td><code>100001</code> 竖条，高度按进度改 <code>sizeDeltaY</code></td><td>颜色用 <code>SetColor</code> 区分四种内容物</td></tr>
+  <tr><td>高光</td><td><code>100001</code> 细竖条，白色半透明</td><td>一条就够，别加多</td></tr>
+  <tr><td>炮筒锥体</td><td><code>100003</code> 三角形</td><td>基础形状里就有三角形，直接当锥体</td></tr>
+  <tr><td>筒口 / 握把 / 螺纹</td><td><code>100001</code> 圆角小条</td><td>螺纹用 2~3 条斜条叠出来即可</td></tr>
+  <tr><td>点火火焰</td><td><code>100002</code> 圆（拉高）+ 颜色渐变不可用 → 用 2~3 个圆错位叠出火苗</td><td>千星没有渐变，火苗靠"多个椭圆叠"</td></tr>
+</table>
+
+<p class="sub" style="margin-top:22px">
+  ⚠️ 这是**形状定稿稿**（网页画的，为了快速改）。你圈一下：杯身再收窄一点？炮筒锥度更尖？握把位置对不对？火要不要更大？<br>
+  定完之后我按上面那张表在千星里拼出来，先让它们**静态显示在工位上**，再接动作。
+</p>
+
+</body>
+</html>

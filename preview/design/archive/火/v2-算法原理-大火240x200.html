@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>雪皇的后厨 · 火：DOOM 火焰算法（格子版）</title>
+<style>
+  :root{ --text:#EEF3FC; --dim:#93a3c4; --gold:#FFD682; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#07090f;color:var(--text);font-family:"Microsoft YaHei","PingFang SC",sans-serif;padding:24px 30px 60px}
+  h1{font-size:20px;font-weight:600} h1 em{color:var(--gold);font-style:normal}
+  .sub{color:var(--dim);font-size:13px;margin:6px 0 16px;line-height:1.7}
+  .sub b{color:var(--text)}
+  h2{font-size:14px;color:var(--gold);margin:24px 0 8px;font-weight:600}
+  .wrap{display:flex;gap:34px;align-items:flex-start;flex-wrap:wrap}
+  canvas{background:#0a0e18;border:1px solid #23304c;border-radius:8px;image-rendering:pixelated}
+  .panel{background:#0d1322;border:1px solid #22304c;border-radius:10px;padding:14px 16px;max-width:560px}
+  .panel h3{font-size:13px;color:var(--text);margin-bottom:6px}
+  .panel p,.panel li{font-size:12.5px;color:var(--dim);line-height:1.75}
+  .panel li{margin-left:16px}
+  code{background:#161d2c;padding:1px 5px;border-radius:3px;color:#cfe0ff;font-size:12px}
+  .legend{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--dim);margin-top:12px}
+  .legend span.sw{display:inline-block;width:16px;height:16px;border-radius:3px;border:1px solid #0006}
+  .cap{font-size:11.5px;color:var(--dim);margin-top:8px;text-align:center}
+  table{border-collapse:collapse;margin-top:10px;font-size:12.5px;max-width:1060px}
+  th,td{border:1px solid #2a3550;padding:7px 11px;text-align:left;vertical-align:top}
+  th{background:#161d2c;color:var(--gold);font-weight:600}
+</style>
+</head>
+<body>
+
+<h1>雪皇的后厨 · <em>火：DOOM 火焰算法（格子版）</em></h1>
+<p class="sub">
+  移植自 GitHub <b>filipedeschamps/doom-fire-algorithm</b>（1417★，JS）。核心只有三行：
+  <b>底部一排点火</b> → 每帧把热量<b>随机地往上传播</b>并衰减 → <b>每个格子按热量取一个纯色</b>。
+  <br>因为传播是随机的，火舌会自己扭动、自己收尖 —— <b>不需要渐变</b>（这正是千星能做的：一堆方块 + 逐格改颜色）。
+</p>
+
+<div class="wrap">
+  <div>
+    <canvas id="fire" width="240" height="200"></canvas>
+    <div class="cap">240 × 200 像素 · 每格 4px（= 120 列 × 50 行）<br>左边这团是真在烧（浏览器打开看）</div>
+    <div class="legend">
+      <b style="color:var(--text);font-weight:600">调色板：</b>
+      <span class="sw" style="background:#07070f"></span>冷（黑）→
+      <span class="sw" style="background:#8a0f0f"></span>暗红 →
+      <span class="sw" style="background:#e03a0c"></span>红 →
+      <span class="sw" style="background:#ff9a1f"></span>橙 →
+      <span class="sw" style="background:#ffe066"></span>黄 →
+      <span class="sw" style="background:#fffbe0"></span>白（最热）
+    </div>
+  </div>
+
+  <div class="panel">
+    <h3>算法就这么多（可直接照抄）</h3>
+    <p>① 建一张 <code>W×H</code> 的热量表，最下面一行固定为最大值（火源）。</p>
+    <p>② 每帧从下往上扫，对每个格子：<code>随机衰减 rand(0..decay)</code> 后，把热量写到<b>下方偏左/偏右一格</b>（随机方向）—— 这就是"火往上窜"。</p>
+    <p>③ 按热量值查调色板得到颜色。</p>
+    <p style="margin-top:8px"><b style="color:#ffd682">为什么它比"画丝带"更适合我们</b>：<br>
+      它只用<b>纯色格子</b>就出了"扭动 + 收尖 + 渐隐"全部效果 —— 而千星刚好只有方块和图元，
+      没有渐变、没有曲线笔刷。<b>这个算法和平台约束是同构的。</b></p>
+  </div>
+</div>
+
+<h2>千星里怎么落：把"格子"换成"方块控件"</h2>
+<table>
+  <tr><th>网页版（算法原型）</th><th>千星版（客户端 Lua）</th></tr>
+  <tr><td>二维热量表 <code>W×H</code></td><td>同样一张 Lua 表；建议 <b>24 列 × 14 行</b>（= 336 个格子，控件预算够）</td></tr>
+  <tr><td>像素/div 格子</td><td>每格一个 <code>100001</code> 方块控件（建一次进池，运行期只改颜色/位置）</td></tr>
+  <tr><td>调色板取色</td><td>同一张调色板（Lua 表），用 <code>SetColor</code>（带 A 通道做"火梢淡掉"）</td></tr>
+  <tr><td>每帧 <code>requestAnimationFrame</code></td><td><code>OnUpdate(dt)</code> 每帧跑同一步；或按 30fps 节流（火不需要 60fps）</td></tr>
+  <tr><td>随机衰减 <code>Math.random()</code></td><td><b>不能用 <code>math.random</code></b>（沙箱会拦）→ 用一个自带的 LCG 伪随机（自备种子，还能保证可复现）</td></tr>
+</table>
+
+<div class="panel" style="margin-top:14px">
+  <h3>控件预算账（这是唯一要小心的）</h3>
+  <p>24×14 = <b>336 个方块</b>。平台是每组上限 1000 个控件，我们现有 UI 已经用了 ~250（工位卡/面板/HUD）。
+  336 + 250 ≈ 590，<b>还有余量</b>，但也就只够一个"大火舞台"。</p>
+  <p style="margin-top:6px">⇒ 建议：<b>只有"正在做的那个工位"才点火</b>（一份 336 格的火池，四个工位轮流用），
+  而不是四个工位各烧一团。这样预算恒定、也不会四个工位一起烧得眼花。</p>
+</div>
+
+<h2>备选（都在 GitHub 上，按"能不能搬进千星"排序）</h2>
+<table>
+  <tr><th>仓库</th><th>★</th><th>技术</th><th>能不能搬进千星</th></tr>
+  <tr><td><b>filipedeschamps/doom-fire-algorithm</b></td><td>1417</td><td>逐格热量传播（Canvas）</td>
+      <td>✅ <b>最佳</b>：只用纯色格子，和"方块 + 逐格改色"完全同构</td></tr>
+  <tr><td>lukaszjajor/doom-fire-svg</td><td>0</td><td>同一算法，用 SVG 滤镜</td>
+      <td>⚠️ 算法一样，但 SVG 滤镜我们没有 → 只抄算法</td></tr>
+  <tr><td>Hartrik/sand-game-js</td><td>44</td><td>落沙元胞自动机（颗粒）</td>
+      <td>✅ 同理可用：颗粒 = 方块，适合做"干冰白雾 / 撒芝麻"</td></tr>
+  <tr><td>neungkl/fire-simulation</td><td>73</td><td>Three.js + 自定义着色器（WebGL）</td>
+      <td>❌ 需要着色器，平台没有 → 只能看感觉</td></tr>
+  <tr><td>AnatolyRybchych/GLSL_Fire、LordHypersonic/Fire-Shader-GLSL</td><td>0</td><td>GLSL 蜡烛火焰噪声</td>
+      <td>❌ 着色器；但它们的"噪声抖动"思路可以用伪随机代替</td></tr>
+</table>
+
+<p class="sub" style="margin-top:18px">
+  ⚠️ 说明：这个会话的 <code>web_search</code> 没有 API key，所以上面是用 <b>GitHub API 直连</b>查的（能查、可复现）。
+  <br>我的建议是<b>只抄 DOOM 那一套</b> —— 它是唯一"用纯色格子就能出真实火焰"的方案，其余都要着色器。
+</p>
+
+<script>
+// ══════════ DOOM 火焰算法（移植版）══════════
+// 原版：filipedeschamps/doom-fire-algorithm（MIT）
+// 这里只做一件事：把"像素"换成"格子"，方便数清千星里要几个方块控件。
+const W = 120, H = 50, CELL = 4;
+const cv = document.getElementById('fire');
+const ctx = cv.getContext('2d');
+const off = document.createElement('canvas');
+off.width = W; off.height = H;
+const octx = off.getContext('2d');
+const img = octx.createImageData(W, H);
+
+// 调色板：冷 → 热（DOOM 那套 37 色的精简版，加了 alpha 让火梢淡出去）
+const PAL = [
+  [7,7,15,0],      [26,10,10,40],   [60,12,10,90],   [100,15,12,140],
+  [140,20,12,180], [176,28,12,210], [206,40,12,235], [226,58,12,250],
+  [238,78,14,255], [246,100,16,255],[250,120,18,255],[252,140,22,255],
+  [254,158,26,255],[255,172,34,255],[255,186,48,255],[255,198,66,255],
+  [255,208,86,255],[255,216,108,255],[255,224,132,255],[255,232,158,255],
+  [255,238,182,255],[255,244,206,255],[255,249,226,255],[255,252,242,255],
+  [255,255,255,255]
+];
+const N = PAL.length;
+
+const fire = new Uint8Array(W * H);
+function seedBottom(){
+  for (let x = 0; x < W; x++) fire[(H - 1) * W + x] = N - 1;
+}
+seedBottom();
+
+let last = 0;
+function step(){
+  // ★ 核心：从下往上，把热量"随机地"往上一行的左右随机列传播并衰减
+  for (let y = H - 1; y > 0; y--){
+    for (let x = 0; x < W; x++){
+      const src = fire[y * W + x];
+      if (src === 0){ fire[(y - 1) * W + x] = 0; continue; }
+      const decay = (Math.random() * 3) | 0;
+      const nx = x + ((Math.random() * 3) | 0) - 1;     // 左右随机偏一格 → 火舌自己扭
+      const tx = nx < 0 ? 0 : (nx >= W ? W - 1 : nx);
+      fire[(y - 1) * W + tx] = Math.max(0, src - decay);
+    }
+  }
+}
+function draw(){
+  for (let i = 0; i < W * H; i++){
+    const c = PAL[fire[i]] || PAL[0];
+    const o = i * 4;
+    img.data[o] = c[0]; img.data[o+1] = c[1]; img.data[o+2] = c[2]; img.data[o+3] = c[3];
+  }
+  octx.putImageData(img, 0, 0);
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(off, 0, 0, W, H, 0, 0, cv.width, cv.height);
+}
+// ★ 两种模式（2026-09-27 踩坑后加的）：
+//   · 正常打开（浏览器看动画）→ requestAnimationFrame 一直跑
+//   · 带 #still（无头截图用）→ 同步烧若干帧后**停住**，不再跑 rAF。
+//     为什么：无头 Edge 配 --virtual-time-budget 跑"无限 rAF 动画"会卡死/崩（0xC0000409），
+//     页面本身没问题，是截图器的毛病。定住一帧就能出图，而且出的是"真烧了几十帧后的形态"。
+const STILL = location.hash === '#still';
+if (STILL){
+  for (let i = 0; i < 90; i++){ step(); }   // 先烧 90 帧（形态自然）
+  draw();
+} else {
+  requestAnimationFrame(function loop(t){
+    // 30fps 跑就够（火不需要 60fps）—— 千星里同理，别每帧都算
+    if (t - last > 33){ last = t; step(); draw(); }
+    requestAnimationFrame(loop);
+  });
+}
+</script>
+
+</body>
+</html>

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>火 18×30 格 → 15×25 / 12×20</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#07090f;color:#EEF3FC;font-family:"Microsoft YaHei","PingFang SC",sans-serif;padding:26px 30px}
+  .row{display:flex;gap:44px;align-items:flex-end;flex-wrap:nowrap}
+  .it{display:flex;flex-direction:column;align-items:center;gap:8px}
+  .big{display:flex;gap:16px;align-items:flex-end}
+  canvas{image-rendering:pixelated;background:#0a0e18;border:1px solid #2a3550;border-radius:6px}
+  .cap{font-size:13.5px;font-weight:600;color:#FFD682;text-align:center}
+  .sub{font-size:11.5px;color:#93a3c4;text-align:center;line-height:1.7}
+</style>
+</head>
+<body>
+<div class="row">
+  <div class="it">
+    <div class="cap">① 15 × 25（18×30 格）</div>
+    <div class="big">
+      <canvas id="A" width="225" height="375" style="width:225px"></canvas>
+      <canvas id="Ar" width="15" height="25" style="width:15px"></canvas>
+    </div>
+    <div class="sub">左放大 15× ｜ 右<b>实际 15×25</b>（很小）<br>540 方块</div>
+  </div>
+  <div class="it">
+    <div class="cap">② 12 × 20（16×27 格，同比例）</div>
+    <div class="big">
+      <canvas id="B" width="180" height="300" style="width:180px"></canvas>
+      <canvas id="Br" width="12" height="20" style="width:12px"></canvas>
+    </div>
+    <div class="sub">左放大 15× ｜ 右<b>实际 12×20</b><br>432 方块</div>
+  </div>
+  <div class="it">
+    <div class="cap">③ 对照 ④：18×30 格 → 90×150</div>
+    <div class="big">
+      <canvas id="C" width="270" height="450" style="width:270px"></canvas>
+      <canvas id="Cr" width="90" height="150" style="width:90px"></canvas>
+    </div>
+    <div class="sub">左放大 3× ｜ 右实际 90×150<br>上一版（大尺寸）</div>
+  </div>
+</div>
+
+<script>
+const PAL=[[7,7,15,0],[26,10,10,40],[60,12,10,90],[100,15,12,140],[140,20,12,180],[176,28,12,210],
+[206,40,12,235],[226,58,12,250],[238,78,14,255],[246,100,16,255],[250,120,18,255],[252,140,22,255],
+[254,158,26,255],[255,172,34,255],[255,186,48,255],[255,198,66,255],[255,208,86,255],[255,216,108,255],
+[255,224,132,255],[255,232,158,255],[255,238,182,255],[255,244,206,255],[255,249,226,255],[255,252,242,255],[255,255,255,255]];
+const N=PAL.length;
+function mk(bigId, realId, cols, rows, p){
+  const big=document.getElementById(bigId), real=document.getElementById(realId);
+  const bctx=big.getContext('2d'), rctx=real.getContext('2d');
+  const off=document.createElement('canvas'); off.width=cols; off.height=rows;
+  const octx=off.getContext('2d'); const img=octx.createImageData(cols,rows);
+  const heat=new Uint8Array(cols*rows);
+  const cx=(cols-1)/2, halfPx=Math.floor(cols/2);
+  const halfAt = r => Math.max(0.5, halfPx * Math.pow(1 - (rows<=1?0:(rows-1-r)/(rows-1)), p));
+  const allowed = (c,r) => Math.abs(c-cx) <= halfAt(r);
+  function seed(){ for(let r=rows-3;r<rows;r++) for(let c=0;c<cols;c++) if(allowed(c,r)) heat[r*cols+c]=N-1; }
+  seed();
+  function step(){
+    seed();
+    for(let y=rows-1;y>0;y--) for(let x=0;x<cols;x++){
+      const s=heat[y*cols+x];
+      if(s===0){ heat[(y-1)*cols+x]=0; continue; }
+      const d=(Math.random()*3)|0, nx=x+((Math.random()*3)|0)-1;
+      const tx=nx<0?0:(nx>=cols?cols-1:nx);
+      if(!allowed(tx,y-1)){ heat[(y-1)*cols+tx]=0; continue; }
+      heat[(y-1)*cols+tx]=Math.max(0,s-d);
+    }
+  }
+  function draw(){
+    for(let i=0;i<cols*rows;i++){ const c=PAL[heat[i]]||PAL[0]; const o=i*4;
+      img.data[o]=c[0];img.data[o+1]=c[1];img.data[o+2]=c[2];img.data[o+3]=c[3]; }
+    octx.putImageData(img,0,0);
+    for(const [cv,ctx] of [[real,rctx],[big,bctx]]){
+      ctx.clearRect(0,0,cv.width,cv.height); ctx.imageSmoothingEnabled=false;
+      ctx.drawImage(off,0,0,cols,rows,0,0,cv.width,cv.height);
+    }
+  }
+  for(let i=0;i<160;i++) step(); draw();
+  return {step,draw};
+}
+// ① 18×30 格 → 显示 15×25（每格 0.83×0.83）
+const a=mk('A','Ar',18,30,0.9);
+// ② 16×27 格 → 显示 12×20（每格 0.75×0.74，同 3:5 比例，方块更少）
+const b=mk('B','Br',16,27,0.9);
+// ③ 对照 18×30 格 → 显示 90×150
+const c=mk('C','Cr',18,30,0.9);
+const S=[a,b,c];
+if(location.hash!=='#still'){
+  let last=0;
+  requestAnimationFrame(function loop(t){
+    if(t-last>33){ last=t; for(const s of S){ s.step(); s.draw(); } }
+    requestAnimationFrame(loop);
+  });
+}
+</script>
+</body>
+</html>

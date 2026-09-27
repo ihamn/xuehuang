@@ -1,0 +1,142 @@
+{
+ "canvas": {
+  "w": 1280,
+  "h": 720
+ },
+ "script": "dist\\clip_test.lua",
+ "frames": 3,
+ "controls": [
+  {
+   "kind": "ClientUIContainerControl",
+   "name": "Canvas",
+   "x": 0,
+   "y": 0,
+   "depth": 0,
+   "w": 0,
+   "h": 0,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "A_parent",
+   "x": -400,
+   "y": 100,
+   "depth": 1,
+   "art": 0,
+   "artSrc": null,
+   "w": 200,
+   "h": 200,
+   "color": 4282145420,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "A_child",
+   "x": -400,
+   "y": 100,
+   "depth": 2,
+   "art": 0,
+   "artSrc": null,
+   "w": 600,
+   "h": 600,
+   "color": 3370547260,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "B_triangle",
+   "x": -80,
+   "y": 30,
+   "depth": 1,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 100,
+   "h": 140,
+   "color": 4292918914,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "B_mask",
+   "x": -80,
+   "y": -74,
+   "depth": 1,
+   "art": 0,
+   "artSrc": null,
+   "w": 140,
+   "h": 92,
+   "color": 4278849048,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "C_square",
+   "x": 180,
+   "y": 30,
+   "depth": 1,
+   "art": 0,
+   "artSrc": null,
+   "w": 100,
+   "h": 48,
+   "color": 4292918914,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "D_tri1",
+   "x": 460,
+   "y": 60,
+   "depth": 1,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 100,
+   "h": 70,
+   "color": 4292918914,
+   "visible": true,
+   "rot": 0,
+   "active": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "D_tri2",
+   "x": 460,
+   "y": -10,
+   "depth": 1,
+   "art": 100003,
+   "artSrc": {
+    "__kind": "EnumItem",
+    "Name": "StaticReference",
+    "FullName": "Enum.ImageSource.StaticReference",
+    "EnumType": "ImageSource"
+   },
+   "w": 100,
+   "h": 70,
+   "color": 4291340920,
+   "visible": true,
+   "rot": 180,
+   "active": true
+  }
+ ]
+}

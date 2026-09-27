@@ -1,0 +1,33 @@
+# ── 依赖与临时目录（不进仓）──────────────────────────────
+node_modules/
+.edge-tmp/
+_scratch/
+*.log
+
+# ── 编辑器/系统杂物 ──────────────────────────────────────
+Thumbs.db
+desktop.ini
+.DS_Store
+*.tmp
+~$*
+
+# ── 本地私密（绝不上传；本仓目前没有）────────────────────
+*.key
+*.pem
+*.ppk
+id_ed25519*
+.env
+.env.*
+*secret*
+*token*
+
+# ── .gil 备份：只保留最近两份，其余忽略（它们是关卡存档的二进制快照）──
+dist/*.gil.bak
+
+# 说明：**产物（dist/*.lua、preview/、screenshots/）故意保留在仓里** ——
+#   这是"工具链"仓，产物就是"这套工具能跑出什么"的证据；
+#   只有 node_modules / 临时目录 / 密钥才排除。
+#   如果以后觉得仓太大，把下面几行放开即可瘦身：
+# dist/
+# preview/
+# screenshots/

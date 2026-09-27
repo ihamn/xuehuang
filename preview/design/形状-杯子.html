@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>雪皇的后厨 · 杯子（侧壁 8.75° 陡锥）+ 饮料配色</title>
+<style>
+  :root{ --text:#EEF3FC; --dim:#93a3c4; --gold:#FFD682; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#080b12;color:var(--text);font-family:"Microsoft YaHei","PingFang SC",sans-serif;padding:24px 30px 56px}
+  h1{font-size:20px;font-weight:600} h1 em{color:var(--gold);font-style:normal}
+  .sub{color:var(--dim);font-size:13px;margin:6px 0 18px;line-height:1.7}
+  .sub b{color:var(--text)}
+  h2{font-size:14px;color:var(--gold);margin:26px 0 10px;font-weight:600}
+  .line{display:flex;gap:36px;align-items:flex-end;flex-wrap:wrap;padding:18px 22px;
+    background:#0d1322;border:1px solid #22304c;border-radius:12px}
+  .item{display:flex;flex-direction:column;align-items:center;gap:9px}
+  .cap{font-size:11.5px;color:var(--dim);text-align:center;line-height:1.6}
+  .cap b{color:var(--text);font-weight:600;display:block;font-size:12.5px}
+  .cap i{font-style:normal;color:#7f8fb0;font-size:11px}
+  .box{display:flex;align-items:flex-end;justify-content:center}
+  table{border-collapse:collapse;margin-top:10px;font-size:12.5px;max-width:1080px}
+  th,td{border:1px solid #2a3550;padding:7px 11px;text-align:left;vertical-align:top}
+  th{background:#161d2c;color:var(--gold);font-weight:600}
+  code{background:#161d2c;padding:1px 5px;border-radius:3px;color:#cfe0ff;font-size:12px}
+  .sw{display:inline-block;width:13px;height:13px;border-radius:3px;vertical-align:-2px;margin-right:6px;border:1px solid #00000055}
+</style>
+</head>
+<body>
+
+<h1>雪皇的后厨 · <em>杯子：侧壁 8.75° 陡锥</em></h1>
+
+<!-- ★ 一份几何只写一次：所有杯子共用这个 clipPath（液体裁切区=杯内壁） -->
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <clipPath id="innerWall"><polygon points="27.4,24 72.6,24 66.1,126 33.9,126"/></clipPath>
+    <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".40"/>
+      <stop offset="55%" stop-color="#ffffff" stop-opacity=".10"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity=".26"/></linearGradient>
+    <linearGradient id="lemon" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fbffd4"/><stop offset="45%" stop-color="#eaf3a0"/>
+      <stop offset="100%" stop-color="#cfdd6a"/></linearGradient>
+    <linearGradient id="brom" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffe9a8"/><stop offset="50%" stop-color="#f0b444"/>
+      <stop offset="100%" stop-color="#c07a18"/></linearGradient>
+    <linearGradient id="cof" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#c79b6e"/><stop offset="55%" stop-color="#8a5a34"/>
+      <stop offset="100%" stop-color="#5c3a20"/></linearGradient>
+    <linearGradient id="peach" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd9c0"/><stop offset="45%" stop-color="#f7a878"/>
+      <stop offset="100%" stop-color="#d97a4a"/></linearGradient>
+    <linearGradient id="milk" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#eaffd6"/><stop offset="50%" stop-color="#bfe9a8"/>
+      <stop offset="100%" stop-color="#8ecb78"/></linearGradient>
+  </defs>
+</svg>
+
+<p class="sub">
+  按你给的斜率重做：<b>侧壁离垂直 8.75°</b>（从水平量 81.25°；tan = 0.1539）。几何随之定死：
+  高 100 → 每侧内收 <b>15.4</b> → <b>口径 100、底径 69.2</b>。
+  <br>液体也修了：<b>液面是水平的</b>，只有两侧贴杯内壁 —— 之前那版液体做成了内接梯形、上沿跟着斜，所以看着像"杯里套了个小杯"。
+</p>
+
+<h2>一、杯子（陡锥）· 五种饮料（按真实颜色）</h2>
+<div class="line">
+
+  <div class="item">
+    <svg width="150" height="200" viewBox="0 0 100 140">
+      <g clip-path="url(#innerWall)">
+        <rect x="0" y="70" width="100" height="70" fill="url(#lemon)"/>
+        <circle cx="44" cy="92" r="1.8" fill="#fff" opacity=".8"/>
+        <circle cx="56" cy="104" r="1.4" fill="#fff" opacity=".65"/>
+        <ellipse cx="50" cy="70" rx="23" ry="1.6" fill="#fff" opacity=".5"/>
+      </g>
+      <polygon points="25,22 75,22 66.5,128 33.5,128" fill="url(#glass)" stroke="#cfe0f5" stroke-width="2.2" stroke-linejoin="round"/>
+      <g clip-path="url(#innerWall)"><rect x="38" y="30" width="4" height="92" rx="2" fill="#fff" opacity=".45"/></g>
+      <rect x="23" y="15" width="54" height="8" rx="4" fill="#eaf3ff"/>
+      <text x="50" y="138" fill="#93a3c4" font-size="7" text-anchor="middle">液面 62%</text>
+    </svg>
+    <div class="cap"><b>干冰干柠檬水</b><i>淡黄绿</i></div>
+  </div>
+
+  <div class="item">
+    <svg width="150" height="200" viewBox="0 0 100 140">
+      <g clip-path="url(#innerWall)">
+        <rect x="0" y="46" width="100" height="90" fill="url(#brom)"/>
+        <ellipse cx="50" cy="46" rx="23" ry="1.6" fill="#fff" opacity=".45"/>
+      </g>
+      <polygon points="25,22 75,22 66.5,128 33.5,128" fill="url(#glass)" stroke="#cfe0f5" stroke-width="2.2" stroke-linejoin="round"/>
+      <g clip-path="url(#innerWall)"><rect x="38" y="30" width="4" height="92" rx="2" fill="#fff" opacity=".45"/></g>
+      <rect x="23" y="15" width="54" height="8" rx="4" fill="#eaf3ff"/>
+      <text x="50" y="138" fill="#93a3c4" font-size="7" text-anchor="middle">液面 80%</text>
+    </svg>
+    <div class="cap"><b>空杯满杯千溴水</b><i>黄褐（溴水真色）</i></div>
+  </div>
+
+  <div class="item">
+    <svg width="150" height="200" viewBox="0 0 100 140">
+      <g clip-path="url(#innerWall)">
+        <rect x="0" y="34" width="100" height="100" fill="url(#cof)"/>
+        <ellipse cx="50" cy="34" rx="23" ry="1.6" fill="#fff" opacity=".4"/>
+      </g>
+      <polygon points="25,22 75,22 66.5,128 33.5,128" fill="url(#glass)" stroke="#cfe0f5" stroke-width="2.2" stroke-linejoin="round"/>
+      <g clip-path="url(#innerWall)"><rect x="38" y="30" width="4" height="92" rx="2" fill="#fff" opacity=".45"/></g>
+      <rect x="23" y="15" width="54" height="8" rx="4" fill="#eaf3ff"/>
+      <text x="50" y="138" fill="#93a3c4" font-size="7" text-anchor="middle">液面 88%</text>
+    </svg>
+    <div class="cap"><b>现萃速溶咖啡</b><i>深褐</i></div>
+  </div>
+
+  <div class="item">
+    <svg width="150" height="200" viewBox="0 0 100 140">
+      <g clip-path="url(#innerWall)">
+        <rect x="0" y="58" width="100" height="80" fill="url(#peach)"/>
+        <ellipse cx="44" cy="80" rx="6" ry="3.4" fill="#ffe0c8" opacity=".8"/>
+        <ellipse cx="57" cy="96" rx="4.6" ry="2.6" fill="#ffe0c8" opacity=".7"/>
+        <ellipse cx="50" cy="58" rx="23" ry="1.6" fill="#fff" opacity=".45"/>
+      </g>
+      <polygon points="25,22 75,22 66.5,128 33.5,128" fill="url(#glass)" stroke="#cfe0f5" stroke-width="2.2" stroke-linejoin="round"/>
+      <g clip-path="url(#innerWall)"><rect x="38" y="30" width="4" height="92" rx="2" fill="#fff" opacity=".45"/></g>
+      <rect x="23" y="15" width="54" height="8" rx="4" fill="#eaf3ff"/>
+      <text x="50" y="138" fill="#93a3c4" font-size="7" text-anchor="middle">液面 74%</text>
+    </svg>
+    <div class="cap"><b>蟠桃四季春</b><i>桃色果茶</i></div>
+  </div>
+
+  <div class="item">
+    <svg width="150" height="200" viewBox="0 0 100 140">
+      <g clip-path="url(#innerWall)">
+        <rect x="0" y="40" width="100" height="95" fill="url(#milk)"/>
+        <ellipse cx="50" cy="40" rx="23" ry="1.6" fill="#fff" opacity=".45"/>
+      </g>
+      <polygon points="25,22 75,22 66.5,128 33.5,128" fill="url(#glass)" stroke="#cfe0f5" stroke-width="2.2" stroke-linejoin="round"/>
+      <g clip-path="url(#innerWall)"><rect x="38" y="30" width="4" height="92" rx="2" fill="#fff" opacity=".45"/></g>
+      <rect x="23" y="15" width="54" height="8" rx="4" fill="#eaf3ff"/>
+      <text x="50" y="138" fill="#93a3c4" font-size="7" text-anchor="middle">液面 84%</text>
+    </svg>
+    <div class="cap"><b>牛顿苹果奶绿</b><i>奶绿</i></div>
+  </div>
+</div>
+
+<h2>二、液面高度 = 进度（同一个杯子，四个进度）</h2>
+<p class="sub" style="margin:0 0 10px">
+  ★ 注意看：<b>液面永远是水平的一条线</b>，只有两侧跟着杯壁斜 —— 这才像"杯子里的水"。
+  上一版的错是液体上沿也跟着斜了（内接梯形），看着就是"杯里套小杯"。</p>
+<div class="line">
+  <div class="item"><svg width="105" height="150" viewBox="0 0 100 140">
+    <polygon points="25,22 75,22 66.5,128 33.5,128" fill="url(#glass)" stroke="#cfe0f5" stroke-width="2.2"/>
+    <rect x="23" y="15" width="54" height="8" rx="4" fill="#eaf3ff"/>
+    <text x="50" y="139" fill="#93a3c4" font-size="8" text-anchor="middle">0% 空杯</text></svg>
+    <div class="cap">等开工</div></div>
+  <div class="item"><svg width="105" height="150" viewBox="0 0 100 140">
+    <g clip-path="url(#innerWall)"><rect x="0" y="100" width="100" height="40" fill="#8fd0ff"/>
+      <ellipse cx="50" cy="100" rx="22" ry="1.6" fill="#fff" opacity=".5"/></g>
+    <polygon points="25,22 75,22 66.5,128 33.5,128" fill="url(#glass)" stroke="#cfe0f5" stroke-width="2.2"/>
+    <rect x="23" y="15" width="54" height="8" rx="4" fill="#eaf3ff"/>
+    <text x="50" y="139" fill="#93a3c4" font-size="8" text-anchor="middle">25%</text></svg>
+    <div class="cap">加水至七分满</div></div>
+  <div class="item"><svg width="105" height="150" viewBox="0 0 100 140">
+    <g clip-path="url(#innerWall)"><rect x="0" y="66" width="100" height="70" fill="#8fd0ff"/>
+      <ellipse cx="50" cy="66" rx="22" ry="1.6" fill="#fff" opacity=".5"/></g>
+    <polygon points="25,22 75,22 66.5,128 33.5,128" fill="url(#glass)" stroke="#cfe0f5" stroke-width="2.2"/>
+    <rect x="23" y="15" width="54" height="8" rx="4" fill="#eaf3ff"/>
+    <text x="50" y="139" fill="#93a3c4" font-size="8" text-anchor="middle">62%</text></svg>
+    <div class="cap">压到 25000 千帕</div></div>
+  <div class="item"><svg width="105" height="150" viewBox="0 0 100 140">
+    <g clip-path="url(#innerWall)"><rect x="0" y="24" width="100" height="104" fill="#8fd0ff"/></g>
+    <polygon points="25,22 75,22 66.5,128 33.5,128" fill="url(#glass)" stroke="#cfe0f5" stroke-width="2.2"/>
+    <rect x="23" y="15" width="54" height="8" rx="4" fill="#eaf3ff"/>
+    <text x="50" y="139" fill="#93a3c4" font-size="8" text-anchor="middle">100%</text></svg>
+    <div class="cap">满杯 → 完成</div></div>
+</div>
+
+<h2>三、几何（照这个在千星里拼）</h2>
+<table>
+  <tr><th>部位</th><th>几何</th><th>千星做法</th></tr>
+  <tr><td><b>侧壁斜率</b></td><td><b>离垂直 8.75°</b>（tan = 0.1539；从水平量 81.25°）</td><td>基准数，下面所有坐标都由它算出</td></tr>
+  <tr><td>杯身外壁</td><td>口径 <b>100</b> → 底径 <b>69.2</b>，高 <b>100</b>（每侧内收 15.4）</td>
+      <td>一块 <code>100001</code> 方块 + 左右各一条斜条，斜条旋转 <b>8.75°</b></td></tr>
+  <tr><td>杯内壁（液体裁切区）</td><td>口径 94 → 底径 62.4（内缩 3）</td><td>液体按此多边形裁切 → <b>上沿水平、两侧贴壁</b></td></tr>
+  <tr><td>杯口亮边</td><td>宽 54（SVG 坐标）× 8 高</td><td><code>100001</code> 条，比杯身亮一档</td></tr>
+  <tr><td>液体</td><td>液面 y 从 126（空）到 24（满）变化，<b>始终水平</b></td>
+      <td>改 <code>sizeDeltaY</code> + 位置；颜色 <code>SetColor</code></td></tr>
+  <tr><td>高光</td><td>贴左侧内壁，宽 4</td><td>白色 45% 细条，同样按内壁裁</td></tr>
+</table>
+
+<h2>四、饮料配色（按真实颜色）</h2>
+<table>
+  <tr><th>产品</th><th>颜色</th><th>理由</th></tr>
+  <tr><td>干冰干柠檬水</td><td><span class="sw" style="background:#eaf3a0"></span>淡黄绿 <code>#EAF3A0</code></td><td>柠檬水本色（干冰白雾另加一层）</td></tr>
+  <tr><td>空杯满杯千溴水</td><td><span class="sw" style="background:#f0b444"></span>黄褐 <code>#F0B444</code></td><td><b>溴水的真实颜色是黄–橙–褐</b>（早先给成紫色是错的）</td></tr>
+  <tr><td>现萃速溶咖啡</td><td><span class="sw" style="background:#8a5a34"></span>深褐 <code>#8A5A34</code></td><td>咖啡本色</td></tr>
+  <tr><td>蟠桃四季春</td><td><span class="sw" style="background:#f7a878"></span>桃色 <code>#F7A878</code></td><td>果肉把淡茶汤染成桃色</td></tr>
+  <tr><td>牛顿苹果奶绿</td><td><span class="sw" style="background:#bfe9a8"></span>奶绿 <code>#BFE9A8</code></td><td>绿茶 + 奶精</td></tr>
+  <tr><td>白芝麻火麒麟（甜筒）</td><td><span class="sw" style="background:#e0b072"></span>烤脆筒 <code>#E0B072</code></td><td>不是饮料 → 走<b>锥形炮筒</b>那套</td></tr>
+</table>
+
+<p class="sub" style="margin-top:18px">
+  要调的：这个 <b>8.75° 够陡吗</b>（比上一版陡一倍多：底径 100→69）· 液体这样对不对了 ·
+  要不要加冰块/柠檬片这类"看得见的配料"。
+</p>
+
+</body>
+</html>

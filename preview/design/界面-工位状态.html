@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>雪皇的后厨 · 工位状态图鉴</title>
+<style>
+  :root{
+    /* ★ 与 lua/src/skin.lua 的 color 表逐项对齐（改这里必须同步那边） */
+    --shake:#3A7ADC; --fire:#E87E34; --chem:#9E6AE0; --brew:#34B080; --pack:#28C0B0;
+    --hudBg:#0E111A; --panelBg:#1B2033; --cardBg:#232B42; --slotBg:#12151F;
+    --text:#EEF3FC; --dim:#B0BED8; --gold:#FFD682;
+    --good:#7AE8A0; --warn:#FFC460; --bad:#FF7A84;
+    --gap-s:8px; --gap-m:16px; --gap-l:24px; --radius:8px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    background:#0a0c12; color:var(--text);
+    font-family:"Microsoft YaHei","PingFang SC","Noto Sans CJK SC",sans-serif;
+    padding:28px 32px 60px; line-height:1.5;
+  }
+  h1{font-size:22px; font-weight:600; letter-spacing:.5px;}
+  h1 em{color:var(--gold); font-style:normal;}
+  .sub{color:var(--dim); font-size:13px; margin-top:6px;}
+  h2{font-size:15px; color:var(--gold); margin:34px 0 6px; font-weight:600;}
+  .hint{color:var(--dim); font-size:12px; margin-bottom:14px;}
+  .row{display:flex; gap:var(--gap-l); flex-wrap:wrap; align-items:flex-start;}
+  .col{display:flex; flex-direction:column; gap:10px;}
+  .collabel{font-size:12px; color:var(--dim); padding-left:2px;}
+  .collabel b{color:var(--text); font-weight:600;}
+
+  /* ── 工位卡：结构对齐 SK.stationCard ──
+     描边(原色×0.72) + 卡片 + 名称行 + 内容底衬(原色压暗) + 进度条 + 键位胶囊 */
+  .card{
+    width:330px; height:118px; position:relative;
+    border-radius:var(--radius); overflow:hidden;
+    border:2px solid var(--c-dark);
+    background:var(--c);
+    display:grid; grid-template-columns:68px 1fr; grid-template-rows:34px 1fr;
+    box-shadow:0 2px 0 rgba(0,0,0,.35);
+  }
+  .card .name{
+    grid-column:2; grid-row:1; display:flex; align-items:center; gap:var(--gap-s);
+    padding:0 10px; font-size:14px; font-weight:600; color:#fff;
+  }
+  .card .key{
+    margin-left:auto; font-size:11px; font-weight:700;
+    background:rgba(0,0,0,.34); color:#fff; border-radius:4px;
+    min-width:22px; height:20px; display:flex; align-items:center; justify-content:center; padding:0 5px;
+  }
+  .card .icon{
+    grid-column:1; grid-row:1 / span 2; display:flex; align-items:center; justify-content:center;
+    font-size:26px; background:var(--c); border-right:2px solid rgba(255,255,255,.18);
+  }
+  .card .body{
+    grid-column:2; grid-row:2; margin:0 6px 6px 0; border-radius:6px;
+    background:var(--c-panel); padding:8px 10px 20px; position:relative;
+  }
+  .card .step{font-size:14px; color:#fff; line-height:1.35;}
+  .card .meta{font-size:11px; color:rgba(255,255,255,.82); margin-top:3px;}
+  .card .bar{position:absolute; left:10px; right:10px; bottom:7px; height:5px; border-radius:3px; background:rgba(0,0,0,.42); overflow:hidden;}
+  .card .bar > i{display:block; height:100%; background:#fff; border-radius:3px;}
+
+  /* 状态：无活 —— 整卡压暗（与 view.lua 的 darken 0.42 对齐） */
+  .card.idle{background:#243049; border-color:#2b3a55; filter:saturate(.25) brightness(.62);}
+  .card.idle .icon{background:#243049;}
+  .card.idle .body{background:#2b3a55;}
+  /* 状态：有活但没名额 —— 半亮（darken 0.62） */
+  .card.wait{filter:saturate(.6) brightness(.82);}
+  /* 状态：有活可做 —— 原色全亮，浅色高光条 */
+  .card.work{box-shadow:0 0 0 2px rgba(255,255,255,.22), 0 2px 0 rgba(0,0,0,.35);}
+  /* 状态：可出餐（打包台专用） */
+  .card.ready{border-color:var(--good); box-shadow:0 0 0 2px rgba(122,232,160,.35);}
+
+  .card.shake{--c:var(--shake); --c-dark:#2c5ea8; --c-panel:#1f4a86;}
+  .card.fire {--c:var(--fire);  --c-dark:#b8611f; --c-panel:#6f3a15;}
+  .card.chem {--c:var(--chem);  --c-dark:#7a4fb3; --c-panel:#4a2f6d;}
+  .card.brew {--c:var(--brew);  --c-dark:#268059; --c-panel:#194f37;}
+  .card.pack {--c:var(--pack);  --c-dark:#1a8a80; --c-panel:#0f5450;}
+
+  /* 打包台：一条横条（与 view.lua 的 Pk_* 结构对齐） */
+  .packbar{
+    width:700px; height:74px; border-radius:var(--radius); background:var(--pack);
+    border:2px solid #1a8a80; display:grid; grid-template-columns:56px 1fr; align-items:center;
+  }
+  .packbar .pi{font-size:26px; text-align:center;}
+  .packbar .pn{font-size:14px; font-weight:700; color:#fff;}
+  .packbar .pl{font-size:13px; color:#fff; margin-top:2px;}
+  .packbar .pk{float:right; font-size:11px; background:rgba(0,0,0,.34); border-radius:4px; padding:2px 6px; margin-left:8px;}
+
+  table{border-collapse:collapse; margin-top:10px; font-size:13px;}
+  th,td{border:1px solid #2a3550; padding:7px 12px; text-align:left;}
+  th{background:#161d2c; color:var(--gold); font-weight:600;}
+  code{background:#161d2c; padding:1px 5px; border-radius:3px; color:#cfe0ff; font-size:12px;}
+  .swatch{display:inline-block; width:12px; height:12px; border-radius:3px; vertical-align:-1px; margin-right:6px;}
+  footer{margin-top:40px; color:var(--dim); font-size:12px; border-top:1px solid #222b42; padding-top:14px;}
+</style>
+</head>
+<body>
+
+<h1>雪皇的后厨 · <em>工位状态图鉴</em></h1>
+<p class="sub">每个工位在四种状态下长什么样。卡片结构/配色与 <code>lua/src/skin.lua</code>、<code>view.lua</code> 一一对齐 —— 这张图改了，代码要同步改。</p>
+
+<h2>一、四个工位 × 三种状态</h2>
+<p class="hint">上=无活（整卡压暗，明确写"按 X 无效"）｜中=有活可做（原色全亮 + 步骤 + 进度 + 键位）｜下=有活但没名额（半亮，等名额腾出来）</p>
+<div class="row">
+
+  <!-- 捣锤区 -->
+  <div class="col">
+    <div class="collabel"><span class="swatch" style="background:#3A7ADC"></span><b>捣锤区</b> shake · 键 Y</div>
+    <div class="card shake idle">
+      <div class="icon">🧊</div>
+      <div class="name">捣锤区 <span class="key">Y</span></div>
+      <div class="body">
+        <div class="step">本工位无活（按 Y 无效）</div>
+      </div>
+    </div>
+    <div class="card shake work">
+      <div class="icon">🧊</div>
+      <div class="name">捣锤区 <span class="key">Y</span></div>
+      <div class="body">
+        <div class="step">[苹] 把苹果砸进杯子里</div>
+        <div class="meta">连按 2/4</div>
+        <div class="bar"><i style="width:50%"></i></div>
+      </div>
+    </div>
+    <div class="card shake wait">
+      <div class="icon">🧊</div>
+      <div class="name">捣锤区 <span class="key">Y</span></div>
+      <div class="body">
+        <div class="step">有活 · 等名额腾出来</div>
+        <div class="meta">后厨满了（在制 3/3）</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 火系区 -->
+  <div class="col">
+    <div class="collabel"><span class="swatch" style="background:#E87E34"></span><b>火系区</b> fire · 键 H</div>
+    <div class="card fire idle">
+      <div class="icon">🔥</div>
+      <div class="name">火系区 <span class="key">H</span></div>
+      <div class="body"><div class="step">本工位无活（按 H 无效）</div></div>
+    </div>
+    <div class="card fire work">
+      <div class="icon">🔥</div>
+      <div class="name">火系区 <span class="key">H</span></div>
+      <div class="body">
+        <div class="step">[甜] 用喷火枪烤香</div>
+        <div class="meta">按住 H 开始</div>
+        <div class="bar"><i style="width:0%"></i></div>
+      </div>
+    </div>
+    <div class="card fire wait">
+      <div class="icon">🔥</div>
+      <div class="name">火系区 <span class="key">H</span></div>
+      <div class="body">
+        <div class="step">有活 · 等名额腾出来</div>
+        <div class="meta">后厨满了（在制 3/3）</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 化学区 -->
+  <div class="col">
+    <div class="collabel"><span class="swatch" style="background:#9E6AE0"></span><b>化学区</b> chem · 键 K</div>
+    <div class="card chem idle">
+      <div class="icon">🧪</div>
+      <div class="name">化学区 <span class="key">K</span></div>
+      <div class="body"><div class="step">本工位无活（按 K 无效）</div></div>
+    </div>
+    <div class="card chem work">
+      <div class="icon">🧪</div>
+      <div class="name">化学区 <span class="key">K</span></div>
+      <div class="body">
+        <div class="step">[溴] 加满空杯至满杯</div>
+        <div class="meta">连按 3/5</div>
+        <div class="bar"><i style="width:60%"></i></div>
+      </div>
+    </div>
+    <div class="card chem wait">
+      <div class="icon">🧪</div>
+      <div class="name">化学区 <span class="key">K</span></div>
+      <div class="body">
+        <div class="step">有活 · 等名额腾出来</div>
+        <div class="meta">后厨满了（在制 3/3）</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 萃茶区 -->
+  <div class="col">
+    <div class="collabel"><span class="swatch" style="background:#34B080"></span><b>萃茶区</b> brew · 键 P</div>
+    <div class="card brew idle">
+      <div class="icon">🍵</div>
+      <div class="name">萃茶区 <span class="key">P</span></div>
+      <div class="body"><div class="step">本工位无活（按 P 无效）</div></div>
+    </div>
+    <div class="card brew work">
+      <div class="icon">🍵</div>
+      <div class="name">萃茶区 <span class="key">P</span></div>
+      <div class="body">
+        <div class="step">[桃] 注入四季春茶汤</div>
+        <div class="meta">按住 0.4/0.9 秒</div>
+        <div class="bar"><i style="width:44%"></i></div>
+      </div>
+    </div>
+    <div class="card brew wait">
+      <div class="icon">🍵</div>
+      <div class="name">萃茶区 <span class="key">P</span></div>
+      <div class="body">
+        <div class="step">有活 · 等名额腾出来</div>
+        <div class="meta">后厨满了（在制 3/3）</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2>二、打包台（一条横条）</h2>
+<p class="hint">左=没有要交付的｜右=有杯做好、等出餐（把要按的键写在上面）</p>
+<div class="col">
+  <div class="packbar" style="filter:saturate(.3) brightness(.65); border-color:#1b5f59">
+    <div class="pi">🛍️</div>
+    <div><div class="pn">打包台</div><div class="pl">暂时没有要交付的</div></div>
+  </div>
+  <div class="packbar">
+    <div class="pi">🛍️</div>
+    <div>
+      <div class="pn">打包台 <span class="pk">空格 / Z</span></div>
+      <div class="pl">可交付 2 杯　蟠桃四季春 · 牛顿苹果奶绿　← 按 空格 出餐</div>
+    </div>
+  </div>
+</div>
+
+<h2>三、元素对照（做图/改色都按这张表）</h2>
+<table>
+  <tr><th>元素</th><th>取值</th><th>说明</th></tr>
+  <tr><td>工位卡</td><td>684 × 208（2×2）</td><td>设计坐标；图上按比例缩到 330×118 方便看</td></tr>
+  <tr><td>名称行高</td><td>72</td><td>名称行**保留工位原色**，不压暗</td></tr>
+  <tr><td>图标列</td><td>96 宽</td><td>保留原色；图标 32×32（大号）</td></tr>
+  <tr><td>内容底衬</td><td>原色 <b>压暗</b>（同色系，不用纯黑）</td><td>纯黑叠在彩色上会发灰发脏</td></tr>
+  <tr><td>步骤文字</td><td>字号 28（step）</td><td>比区域名（26）大一档：内容 > 标签</td></tr>
+  <tr><td>进度条</td><td>高 8，白色填充</td><td>连按类看次数（2/4），按住类看秒数</td></tr>
+  <tr><td>键位胶囊</td><td>34 × 28，黑 26% 底</td><td>有活时透明度提到 90</td></tr>
+  <tr><td>配色</td><td><span class="swatch" style="background:#3A7ADC"></span>捣锤 #3A7ADC ·
+      <span class="swatch" style="background:#E87E34"></span>火系 #E87E34 ·
+      <span class="swatch" style="background:#9E6AE0"></span>化学 #9E6AE0 ·
+      <span class="swatch" style="background:#34B080"></span>萃茶 #34B080 ·
+      <span class="swatch" style="background:#28C0B0"></span>打包 #28C0B0</td><td>与 <code>skin.lua</code> 的 <code>color</code> 表同值</td></tr>
+  <tr><td>状态语义</td><td>无活=压暗｜有活=原色｜等名额=半亮｜可出餐=绿框</td><td>用**亮度**表达状态，不用整块变红变绿</td></tr>
+</table>
+
+<footer>
+  这份是**视觉定稿讨论用**的稿子（不是交付物）。你圈哪张好看、哪个词看不懂、哪个状态缺了，我照着改 —— 改完再往 <code>skin.lua</code> / <code>view.lua</code> 落。
+</footer>
+
+</body>
+</html>

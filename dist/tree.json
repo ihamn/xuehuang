@@ -1,0 +1,139 @@
+{
+ "canvas": {
+  "w": 1280,
+  "h": 720
+ },
+ "script": "lua\\src\\hello.lua",
+ "frames": 60,
+ "controls": [
+  {
+   "kind": "ClientUIContainerControl",
+   "name": "Canvas",
+   "x": 0,
+   "y": 0,
+   "w": 0,
+   "h": 0,
+   "visible": true
+  },
+  {
+   "kind": "ClientUITextBoxControl",
+   "name": "Title",
+   "text": "雪皇的后厨 · 荒诞饮品模拟器",
+   "x": 0,
+   "y": 300,
+   "w": 900,
+   "h": 56,
+   "visible": true
+  },
+  {
+   "kind": "ClientUITextBoxControl",
+   "name": "Info",
+   "text": "跑起来了 · 2.0s · 画布 1280x720 · 控件 12 个",
+   "x": 0,
+   "y": 250,
+   "w": 900,
+   "h": 34,
+   "visible": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "Station1",
+   "x": -162,
+   "y": 60,
+   "w": 300,
+   "h": 110,
+   "color": 4280165942,
+   "visible": true
+  },
+  {
+   "kind": "ClientUITextBoxControl",
+   "name": "StationLabel1",
+   "text": "捣锤区 B",
+   "x": -162,
+   "y": 86,
+   "w": 280,
+   "h": 30,
+   "visible": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "Station2",
+   "x": 162,
+   "y": 60,
+   "w": 300,
+   "h": 110,
+   "color": 4280165942,
+   "visible": true
+  },
+  {
+   "kind": "ClientUITextBoxControl",
+   "name": "StationLabel2",
+   "text": "火系区 H",
+   "x": 162,
+   "y": 86,
+   "w": 280,
+   "h": 30,
+   "visible": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "Station3",
+   "x": -162,
+   "y": -70,
+   "w": 300,
+   "h": 110,
+   "color": 4280165942,
+   "visible": true
+  },
+  {
+   "kind": "ClientUITextBoxControl",
+   "name": "StationLabel3",
+   "text": "化学区 C",
+   "x": -162,
+   "y": -44,
+   "w": 280,
+   "h": 30,
+   "visible": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "Station4",
+   "x": 162,
+   "y": -70,
+   "w": 300,
+   "h": 110,
+   "color": 4280165942,
+   "visible": true
+  },
+  {
+   "kind": "ClientUITextBoxControl",
+   "name": "StationLabel4",
+   "text": "萃茶区 P",
+   "x": 162,
+   "y": -44,
+   "w": 280,
+   "h": 30,
+   "visible": true
+  },
+  {
+   "kind": "ClientUIImageControl",
+   "name": "Pack",
+   "x": 0,
+   "y": -190,
+   "w": 624,
+   "h": 84,
+   "color": 4280820246,
+   "visible": true
+  },
+  {
+   "kind": "ClientUITextBoxControl",
+   "name": "PackLabel",
+   "text": "打包台  ␣",
+   "x": 0,
+   "y": -190,
+   "w": 600,
+   "h": 30,
+   "visible": true
+  }
+ ]
+}

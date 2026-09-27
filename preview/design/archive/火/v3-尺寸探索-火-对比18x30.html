@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>火：18×30 vs 30×30（放一起看）</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#07090f;color:#EEF3FC;font-family:"Microsoft YaHei","PingFang SC",sans-serif;padding:30px 34px}
+  .row{display:flex;gap:40px;align-items:flex-end;flex-wrap:nowrap}
+  .it{display:flex;flex-direction:column;align-items:center;gap:10px}
+  .big{display:flex;gap:22px;align-items:flex-end}
+  canvas{image-rendering:pixelated;background:#0a0e18;border:1px solid #2a3category}
+  canvas{image-rendering:pixelated;background:#0a0e18;border:1px solid #2a3550;border-radius:6px}
+  .cap{font-size:14px;font-weight:600;color:#FFD682;text-align:center}
+  .sub{font-size:12px;color:#93a3c4;text-align:center;line-height:1.7}
+  .tag{font-size:11px;color:#7f8fb0;text-align:center}
+</style>
+</head>
+<body>
+<div class="row">
+
+  <div class="it">
+    <div class="cap">① 30 列 × 30 行（900 方块）</div>
+    <div class="big">
+      <canvas id="A" width="300" height="300" style="width:300px"></canvas>
+      <canvas id="Areal" width="90" height="90" style="width:90px"></canvas>
+    </div>
+    <div class="sub">左：放大 3.3× ｜ 右：实际 90×90<br>方正、细碎，像"一团火"</div>
+  </div>
+
+  <div class="it">
+    <div class="cap">② 18 列 × 30 行（540 方块）← 你选的</div>
+    <div class="big">
+      <canvas id="B" width="300" height="300" style="width:300px"></canvas>
+      <canvas id="Breal" width="90" height="90" style="width:90px"></canvas>
+    </div>
+    <div class="sub">左：放大 3.3× ｜ 右：实际 90×90<br>每格更宽更扁 → <b>火柱更竖直、窜得更高</b></div>
+  </div>
+
+</div>
+
+<script>
+const PAL=[[7,7,15,0],[26,10,10,40],[60,12,10,90],[100,15,12,140],[140,20,12,180],[176,28,12,210],
+[206,40,12,235],[226,58,12,250],[238,78,14,255],[246,100,16,255],[250,120,18,255],[252,140,22,255],
+[254,158,26,255],[255,172,34,255],[255,186,48,255],[255,198,66,255],[255,208,86,255],[255,216,108,255],
+[255,224,132,255],[255,232,158,255],[255,238,182,255],[255,244,206,255],[255,249,226,255],[255,252,242,255],[255,255,255,255]];
+const N=PAL.length;
+function mk(big, real, cols, rows){
+  const bctx=big.getContext('2d'), rctx=real.getContext('2d');
+  const off=document.createElement('canvas'); off.width=cols; off.height=rows;
+  const octx=off.getContext('2d'); const img=octx.createImageData(cols,rows);
+  const heat=new Uint8Array(cols*rows);
+  for(let x=0;x<cols;x++){ heat[(rows-1)*cols+x]=N-1; if(rows>1) heat[(rows-2)*cols+x]=N-2; }
+  function step(){
+    for(let y=rows-1;y>0;y--) for(let x=0;x<cols;x++){
+      const s=heat[y*cols+x]; if(s===0){heat[(y-1)*cols+x]=0;continue;}
+      const d=(Math.random()*3)|0, nx=x+((Math.random()*3)|0)-1;
+      const tx=nx<0?0:(nx>=cols?cols-1:nx);
+      heat[(y-1)*cols+tx]=Math.max(0,s-d);
+    }
+  }
+  function draw(){
+    for(let i=0;i<cols*rows;i++){ const c=PAL[heat[i]]||PAL[0]; const o=i*4;
+      img.data[o]=c[0];img.data[o+1]=c[1];img.data[o+2]=c[2];img.data[o+3]=c[3]; }
+    octx.putImageData(img,0,0);
+    for(const [cv,ctx] of [[real,rctx],[big,bctx]]){
+      ctx.clearRect(0,0,cv.width,cv.height); ctx.imageSmoothingEnabled=false;
+      ctx.drawImage(off,0,0,cols,rows,0,0,cv.width,cv.height);
+    }
+  }
+  for(let i=0;i<140;i++) step(); draw();
+  return {step,draw};
+}
+const a=mk(document.getElementById('A'),document.getElementById('Areal'),30,30);
+const b=mk(document.getElementById('B'),document.getElementById('Breal'),18,30);
+if(location.hash!=='#still'){
+  let last=0;
+  requestAnimationFrame(function loop(t){
+    if(t-last>33){last=t;a.step();a.draw();b.step();b.draw();}
+    requestAnimationFrame(loop);
+  });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>雪皇的后厨 · 实物形状（杯子 / 锥形炮筒）</title>
+<style>
+  :root{ --text:#EEF3FC; --dim:#93a3c4; --gold:#FFD682; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#080b12;color:var(--text);font-family:"Microsoft YaHei","PingFang SC",sans-serif;padding:26px 30px 60px}
+  h1{font-size:20px;font-weight:600} h1 em{color:var(--gold);font-style:normal}
+  .sub{color:var(--dim);font-size:13px;margin:6px 0 20px;line-height:1.6}
+  .sub b{color:var(--text)}
+  h2{font-size:14px;color:var(--gold);margin:28px 0 10px;font-weight:600}
+  .line{display:flex;gap:44px;align-items:flex-end;flex-wrap:wrap;padding:18px 22px;
+    background:#0d1322;border:1px solid #22304c;border-radius:12px}
+  .item{display:flex;flex-direction:column;align-items:center;gap:10px}
+  .cap{font-size:11px;color:var(--dim);text-align:center;line-height:1.6}
+  .cap b{color:var(--text);font-weight:600}
+  .box{display:flex;align-items:flex-end;justify-content:center;min-height:150px}
+  table{border-collapse:collapse;margin-top:10px;font-size:12.5px;max-width:1020px}
+  th,td{border:1px solid #2a3550;padding:7px 11px;text-align:left;vertical-align:top}
+  th{background:#161d2c;color:var(--gold);font-weight:600}
+  code{background:#161d2c;padding:1px 5px;border-radius:3px;color:#cfe0ff;font-size:12px}
+</style>
+</head>
+<body>
+
+<h1>雪皇的后厨 · <em>实物形状</em>：杯子 / 锥形炮筒</h1>
+<p class="sub">
+  这两个是后面所有演出的主角 —— <b>摇的是这个杯子、砸的是这个杯子</b>；<b>炮筒</b>是甜筒那道工序里"掏出来的那个筒"。<br>
+  用 SVG 画是为了边界可读（每条边的端点都是明确坐标），我照这些坐标在千星里用基础形状拼出来。
+</p>
+
+<h2>一、杯子（锥形杯：口径 100 → 底径 66）</h2>
+<div class="line">
+  <!-- 清水 -->
+  <div class="item"><div class="box">
+    <svg width="150" height="180" viewBox="0 0 150 180">
+      <defs><linearGradient id="glass" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#ffffff" stop-opacity=".42"/>
+        <stop offset="55%" stop-color="#ffffff" stop-opacity=".12"/>
+        <stop offset="100%" stop-color="#ffffff" stop-opacity=".30"/></linearGradient>
+      <linearGradient id="water" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#e2f2ff"/><stop offset="100%" stop-color="#6fb6ea"/></linearGradient></defs>
+      <polygon points="25,26 125,26 108,164 42,164" fill="url(#glass)" stroke="#cfe0f5" stroke-width="2.5" stroke-linejoin="round"/>
+      <polygon points="28,88 122,88 108,162 42,162" fill="url(#water)" opacity=".92"/>
+      <rect x="24" y="18" width="102" height="10" rx="5" fill="#eaf3ff"/>
+      <rect x="41" y="34" width="9" height="106" rx="4.5" fill="#ffffff" opacity=".55"/>
+      <text x="75" y="176" fill="#93a3c4" font-size="11" text-anchor="middle">清水 · 液面 55%</text>
+    </svg></div>
+    <div class="cap"><b>水</b></div></div>
+
+  <!-- 茶汤 -->
+  <div class="item"><div class="box">
+    <svg width="150" height="180" viewBox="0 0 150 180">
+      <defs><linearGradient id="tea" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#ffe6bd"/><stop offset="100%" stop-color="#d99036"/></linearGradient></defs>
+      <polygon points="25,26 125,26 108,164 42,164" fill="url(#glass)" stroke="#cfe0f5" stroke-width="2.5" stroke-linejoin="round"/>
+      <polygon points="29,106 121,106 108,162 42,162" fill="url(#tea)" opacity=".95"/>
+      <rect x="24" y="18" width="102" height="10" rx="5" fill="#eaf3ff"/>
+      <rect x="41" y="34" width="9" height="106" rx="4.5" fill="#ffffff" opacity=".5"/>
+      <text x="75" y="176" fill="#93a3c4" font-size="11" text-anchor="middle">茶汤 · 液面 40%</text>
+    </svg></div>
+    <div class="cap"><b>茶汤</b></div></div>
+
+  <!-- 溴水 -->
+  <div class="item"><div class="box">
+    <svg width="150" height="180" viewBox="0 0 150 180">
+      <defs><linearGradient id="brom" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#eddcff"/><stop offset="100%" stop-color="#9b6fd8"/></linearGradient></defs>
+      <polygon points="25,26 125,26 108,164 42,164" fill="url(#glass)" stroke="#cfe0f5" stroke-width="2.5" stroke-linejoin="round"/>
+      <polygon points="27,64 123,64 108,162 42,162" fill="url(#brom)" opacity=".95"/>
+      <rect x="24" y="18" width="102" height="10" rx="5" fill="#eaf3ff"/>
+      <rect x="41" y="34" width="9" height="106" rx="4.5" fill="#ffffff" opacity=".45"/>
+      <text x="75" y="176" fill="#93a3c4" font-size="11" text-anchor="middle">溴水 · 液面 72%</text>
+    </svg></div>
+    <div class="cap"><b>溴水</b></div></div>
+
+  <!-- 四季春 -->
+  <div class="item"><div class="box">
+    <svg width="150" height="180" viewBox="0 0 150 180">
+      <defs><linearGradient id="green" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#d8ffec"/><stop offset="100%" stop-color="#38ad76"/></linearGradient></defs>
+      <polygon points="25,26 125,26 108,164 42,164" fill="url(#glass)" stroke="#cfe0f5" stroke-width="2.5" stroke-linejoin="round"/>
+      <polygon points="30,116 120,116 108,162 42,162" fill="url(#green)" opacity=".95"/>
+      <rect x="24" y="18" width="102" height="10" rx="5" fill="#eaf3ff"/>
+      <rect x="41" y="34" width="9" height="106" rx="4.5" fill="#ffffff" opacity=".5"/>
+      <text x="75" y="176" fill="#93a3c4" font-size="11" text-anchor="middle">四季春 · 液面 32%</text>
+    </svg></div>
+    <div class="cap"><b>四季春</b></div></div>
+</div>
+
+<h2>二、锥形"炮筒"（锥尖朝下 · 筒口朝上）</h2>
+<div class="line">
+  <!-- 静止 -->
+  <div class="item"><div class="box">
+    <svg width="160" height="230" viewBox="0 0 160 230">
+      <defs><linearGradient id="coneG" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#f8e0b4"/><stop offset="45%" stop-color="#e0b072"/>
+        <stop offset="100%" stop-color="#a9762f"/></linearGradient>
+      <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#3d4a66"/><stop offset="100%" stop-color="#1b2233"/></linearGradient></defs>
+      <!-- 锥体 -->
+      <polygon points="80,214 28,52 132,52" fill="url(#coneG)" stroke="#8a5c28" stroke-width="2" stroke-linejoin="round"/>
+      <!-- 螺纹 -->
+      <path d="M38 92 L122 84" stroke="#8a5c28" stroke-width="3" stroke-opacity=".5" stroke-linecap="round"/>
+      <path d="M44 128 L116 120" stroke="#8a5c28" stroke-width="3" stroke-opacity=".5" stroke-linecap="round"/>
+      <path d="M52 164 L108 156" stroke="#8a5c28" stroke-width="3" stroke-opacity=".5" stroke-linecap="round"/>
+      <!-- 握把 -->
+      <rect x="30" y="30" width="100" height="26" rx="6" fill="url(#metal)" stroke="#4d5d82" stroke-width="1.5"/>
+      <path d="M42 43 H118" stroke="#6d80ab" stroke-width="4" stroke-dasharray="7 7" stroke-linecap="round"/>
+      <!-- 筒口 -->
+      <rect x="22" y="14" width="116" height="20" rx="7" fill="#f2d7a6" stroke="#a9762f" stroke-width="2"/>
+      <rect x="40" y="19" width="80" height="10" rx="5" fill="#5a3a1c"/>
+      <!-- 高光 -->
+      <path d="M58 60 L52 176" stroke="#fff" stroke-opacity=".4" stroke-width="6" stroke-linecap="round"/>
+      <text x="80" y="228" fill="#93a3c4" font-size="11" text-anchor="middle">静止</text>
+    </svg></div>
+    <div class="cap"><b>炮筒</b><br>160 × 230</div></div>
+
+  <!-- 点火 -->
+  <div class="item"><div class="box">
+    <svg width="160" height="230" viewBox="0 0 160 230">
+      <!-- 火焰（画在筒口上方） -->
+      <ellipse cx="80" cy="6" rx="26" ry="34" fill="#ffb347" opacity=".9"/>
+      <ellipse cx="80" cy="14" rx="16" ry="24" fill="#ffe9a8" opacity=".95"/>
+      <ellipse cx="80" cy="20" rx="8" ry="14" fill="#fffdf0"/>
+      <polygon points="80,214 28,52 132,52" fill="url(#coneG)" stroke="#8a5c28" stroke-width="2" stroke-linejoin="round"/>
+      <path d="M38 92 L122 84" stroke="#8a5c28" stroke-width="3" stroke-opacity=".5" stroke-linecap="round"/>
+      <path d="M44 128 L116 120" stroke="#8a5c28" stroke-width="3" stroke-opacity=".5" stroke-linecap="round"/>
+      <path d="M52 164 L108 156" stroke="#8a5c28" stroke-width="3" stroke-opacity=".5" stroke-linecap="round"/>
+      <rect x="30" y="30" width="100" height="26" rx="6" fill="url(#metal)" stroke="#4d5d82" stroke-width="1.5"/>
+      <path d="M42 43 H118" stroke="#6d80ab" stroke-width="4" stroke-dasharray="7 7" stroke-linecap="round"/>
+      <rect x="22" y="14" width="116" height="20" rx="7" fill="#ffd98f" stroke="#a9762f" stroke-width="2"/>
+      <rect x="40" y="19" width="80" height="10" rx="5" fill="#ff8a2b"/>
+      <path d="M58 60 L52 176" stroke="#fff" stroke-opacity=".4" stroke-width="6" stroke-linecap="round"/>
+      <text x="80" y="228" fill="#93a3c4" font-size="11" text-anchor="middle">点火（筒口喷火）</text>
+    </svg></div>
+    <div class="cap"><b>烤甜筒那一步</b><br>从筒口喷火</div></div>
+
+  <!-- 小尺寸 -->
+  <div class="item"><div class="box">
+    <svg width="70" height="100" viewBox="0 0 160 230">
+      <polygon points="80,214 28,52 132,52" fill="url(#coneG)" stroke="#8a5c28" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M38 92 L122 84" stroke="#8a5c28" stroke-width="7" stroke-opacity=".5" stroke-linecap="round"/>
+      <path d="M44 128 L116 120" stroke="#8a5c28" stroke-width="7" stroke-opacity=".5" stroke-linecap="round"/>
+      <path d="M52 164 L108 156" stroke="#8a5c28" stroke-width="7" stroke-opacity=".5" stroke-linecap="round"/>
+      <rect x="30" y="30" width="100" height="26" rx="6" fill="url(#metal)"/>
+      <rect x="22" y="14" width="116" height="20" rx="7" fill="#f2d7a6" stroke="#a9762f" stroke-width="3"/>
+      <rect x="40" y="19" width="80" height="10" rx="5" fill="#5a3a1c"/>
+    </svg></div>
+    <div class="cap"><b>缩略尺寸</b><br>52 × 74（小票/角落用）</div></div>
+</div>
+
+<h2>三、照这些坐标在千星里怎么拼</h2>
+<table>
+  <tr><th>部件</th><th>千星控件</th><th>坐标 / 做法</th></tr>
+  <tr><td>杯身</td><td>基础形状 <code>100001</code> 方块</td><td>杯身整体用一块方块（宽 100 高 138），左右各压一条**斜条**（方块旋转 ±3.7°）把腰线收出来 → 视觉就是锥形杯</td></tr>
+  <tr><td>杯口亮边</td><td><code>100001</code> 条</td><td>宽 102 高 10，压在杯身上沿（比杯身亮一档）</td></tr>
+  <tr><td>液体</td><td><code>100001</code> 条</td><td>宽 96、高度 = 138 × 进度；<b>液面高度就是这一步的进度</b></td></tr>
+  <tr><td>高光</td><td><code>100001</code> 细条</td><td>宽 9 高 106，左侧偏内，白色 55%</td></tr>
+  <tr><td>锥体</td><td><b><code>100003</code> 三角形</b></td><td>高 162、宽 104，**尖朝下**（旋转 180°）</td></tr>
+  <tr><td>筒口</td><td><code>100001</code> 条</td><td>宽 116 高 20 圆角；中间再压一条深色条（内壁）</td></tr>
+  <tr><td>握把</td><td><code>100001</code> 条 + 刻纹</td><td>宽 100 高 26 深色；刻纹用 4~5 个白色小方块横排</td></tr>
+  <tr><td>螺纹</td><td><code>100001</code> 细条</td><td>3 条，各旋转 ∓2.5°、逐条变短（锥体越往下越窄）</td></tr>
+  <tr><td>火焰</td><td><code>100002</code> 圆 ×3 叠</td><td>大→中→小三颗错位叠；千星没有渐变，靠三层椭圆出火苗层次</td></tr>
+</table>
+
+<p class="sub" style="margin-top:20px">
+  ⚠️ 这是**形状定稿稿**。请圈一下要改的地方：杯腰再收窄？炮筒锥度更尖 / 更钝？握把往上还是往下？火焰更大还是更小？<br>
+  定完我按第三节那张表在千星里拼出来，先在工位上**静态显示**，再接动作（摇 / 砸 / 喷火）。
+</p>
+</body>
+</html>

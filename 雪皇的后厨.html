@@ -1,0 +1,2201 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>雪皇的后厨 · 荒诞饮品模拟器</title>
+<style>
+:root{
+  --bg:#0e1016; --bg2:#141824; --panel:#1a2030; --panel2:#212a3d;
+  --line:#2c3purple; --line:#2c364d; --ink:#e9eefb; --dim:#8e9bb5; --dim2:#66748f;
+  --snow:#ff5e6c; --snow2:#ff8a94; --cream:#ffe9c9; --gold:#ffcf6b;
+  --ok:#5fe08a; --warn:#ffc14d; --bad:#ff6b6b; --sci:#7ee0ff;
+  --r:14px;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0; background:radial-gradient(1200px 700px at 20% -10%,#1c2333,#0e1016 60%);
+  color:var(--ink); font:14px/1.5 "Microsoft YaHei","PingFang SC","Hiragino Sans GB",system-ui,sans-serif;
+  overflow:hidden; user-select:none; -webkit-user-select:none;
+}
+button{font-family:inherit}
+
+/* ---------- 顶栏 ---------- */
+#top{
+  display:flex; align-items:center; gap:14px; padding:10px 16px;
+  background:linear-gradient(180deg,#1b2233,#151b28); border-bottom:1px solid var(--line);
+  position:relative; z-index:5;
+}
+.brand{display:flex; align-items:baseline; gap:8px; min-width:220px}
+.brand b{font-size:17px; letter-spacing:.5px; color:#fff; text-shadow:0 0 18px rgba(255,94,108,.45)}
+.brand span{font-size:11px; color:var(--dim2)}
+.brand .ver{font-size:10px; color:#8ee08a; border:1px solid #2f6b4f; background:#14251b; border-radius:999px; padding:0 6px}
+#daybar{display:flex; align-items:center; gap:8px; flex:1}
+.daypip{
+  flex:1; height:26px; border-radius:8px; background:#10141e; border:1px solid var(--line);
+  display:flex; align-items:center; justify-content:center; font-size:11px; color:var(--dim2);
+  position:relative; overflow:hidden;
+}
+.daypip .fill{position:absolute; inset:0; width:0%; background:linear-gradient(90deg,#2a3550,#3c4a70); transition:width .12s linear}
+.daypip .lab{position:relative; z-index:1; font-weight:600}
+.daypip.now{border-color:#ff5e6c88; box-shadow:0 0 0 1px #ff5e6c33 inset}
+.daypip.now .lab{color:#fff}
+.daypip.done .fill{background:linear-gradient(90deg,#26543f,#2f6b4f)}
+.daypip.done .lab{color:#a8f0c4}
+.clock{min-width:250px; text-align:right}
+.clock .now{font-size:20px; font-weight:800; font-variant-numeric:tabular-nums; letter-spacing:.5px}
+.clock .sub{font-size:11px; color:var(--dim2)}
+.clock.late .now{color:var(--bad); animation:blink 1s infinite}
+@keyframes blink{50%{opacity:.45}}
+.btn{
+  background:#243049; color:var(--ink); border:1px solid #35446a; border-radius:10px;
+  padding:7px 12px; cursor:pointer; font-size:12px; transition:.15s;
+}
+.btn:hover{background:#2d3b5c; transform:translateY(-1px)}
+.btn.pri{background:linear-gradient(180deg,#ff5e6c,#d93b4c); border-color:#ff8a94; font-weight:700; color:#fff}
+.btn.pri:hover{filter:brightness(1.08)}
+
+/* ---------- 布局 ---------- */
+#stage{display:grid; grid-template-columns:minmax(250px,280px) 1fr minmax(260px,300px); gap:12px; padding:12px; height:calc(100vh - 59px)}
+.col{min-height:0; display:flex; flex-direction:column; gap:10px}
+.card{background:linear-gradient(180deg,var(--panel),#171d2b); border:1px solid var(--line); border-radius:var(--r); box-shadow:0 6px 22px #0006}
+.ctitle{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:9px 12px; border-bottom:1px solid var(--line); font-size:12.5px; font-weight:700; color:#cfd8ee;
+}
+.ctitle .n{font-size:11px; color:var(--dim2); font-weight:400}
+.ctitle .tip{font-size:11px; color:var(--dim2); font-weight:400}
+
+/* ---------- 订单 ---------- */
+#orders{flex:1; overflow-y:auto; padding:10px; display:flex; flex-direction:column; gap:9px}
+#orders::-webkit-scrollbar{width:8px} #orders::-webkit-scrollbar-thumb{background:#2b344c;border-radius:8px}
+.ord{
+  background:linear-gradient(180deg,#211f2c,#1b1a24); border:1px solid #39304a; border-radius:12px;
+  padding:9px 10px; position:relative; overflow:hidden;
+}
+.ord .who{display:flex; justify-content:space-between; align-items:center; font-size:11px; color:var(--dim2)}
+.ord .who b{color:var(--cream)}
+.ord .drink{display:flex; align-items:center; gap:6px; margin:5px 0 6px; font-weight:800; font-size:14px; color:#fff}
+.ord .drink .emo{font-size:16px}
+.ord .mods{display:flex; gap:5px; flex-wrap:wrap; font-size:10.5px}
+.tag{background:#2a3348; border:1px solid #3a4763; color:#b9c6e2; border-radius:999px; padding:1px 7px}
+.tag.ice{background:#16303d;border-color:#2b5a70;color:#a6e4ff}
+.tag.sug{background:#3a2f16;border-color:#6b5522;color:#ffe0a3}
+.ord .cups{display:flex; gap:4px; margin-top:7px}
+.cupdot{width:14px;height:14px;border-radius:4px;background:#171c28;border:1px solid #3a4258;position:relative}
+.cupdot.on{background:linear-gradient(180deg,#ffd08a,#e8a94f);border-color:#ffe0a3;box-shadow:0 0 10px #ffcf6b66}
+.cupdot.err{background:#5c1f24;border-color:#ff6b6b}
+.pat{height:4px; border-radius:4px; background:#2a3040; margin-top:8px; overflow:hidden}
+.pat i{display:block;height:100%;background:linear-gradient(90deg,#5fe08a,#ffc14d);transition:width .2s linear}
+.ord.urgent{border-color:#ff6b6b88; animation:upulse .9s infinite}
+.ord.urgent .pat i{background:linear-gradient(90deg,#ffc14d,#ff5e6c)}
+@keyframes upulse{50%{box-shadow:0 0 0 3px #ff5e6c22}}
+.ord.leaving{animation:leave .5s forwards}
+@keyframes leave{to{transform:translateX(-40px) scale(.92); opacity:0}}
+.ord .left{position:absolute;right:8px;top:6px;font-size:10px;color:var(--bad);font-weight:700}
+/* 排队中的客人：灰一点，但**耐心条是真的在掉**（排队也吃耐心，只是慢一档） */
+.ord.waiting{background:linear-gradient(180deg,#1a1c26,#161822); border-color:#2f3444; opacity:.94}
+.ord.waiting .drink{color:#c9d0e2}
+
+/* ---------- 工位 ---------- */
+#stations{display:grid; grid-template-columns:repeat(2,1fr); grid-template-rows:repeat(2,1fr); gap:10px; flex:1; min-height:0}
+.st{
+  position:relative; background:linear-gradient(180deg,var(--panel),#161c29); border:1px solid var(--line);
+  border-radius:16px; padding:10px 12px; display:flex; flex-direction:column; min-height:0; transition:.15s;
+}
+.st .hd{display:flex; align-items:center; gap:8px}
+.st .ic{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;font-size:16px;background:#0e1421;border:1px solid #2c364d}
+.st .nm{font-weight:800; font-size:13.5px}
+.st .key{margin-left:auto; font-size:10px; color:var(--dim2); border:1px solid #333d56; border-radius:5px; padding:0 5px}
+.st .desc{font-size:10.5px; color:var(--dim2); margin-top:3px; min-height:15px}
+.queue{flex:1; overflow-y:auto; margin:8px 0; display:flex; flex-direction:column; gap:6px; min-height:0}
+.queue::-webkit-scrollbar{width:6px} .queue::-webkit-scrollbar-thumb{background:#2b344c;border-radius:6px}
+.qc{
+  background:#151a26; border:1px solid #2b344c; border-radius:10px; padding:6px 8px;
+  font-size:11.5px; display:flex; align-items:center; gap:7px; cursor:grab;
+}
+.qc:active{cursor:grabbing}
+.qc .d{font-weight:700; color:#fff; font-size:12px}
+.qc .nx{margin-left:auto; font-size:10px; color:var(--gold)}
+.qc .fwd{display:none; font-size:10px; color:#0e1421; background:#ffcf6b; border-radius:999px; padding:1px 7px; font-weight:700; white-space:nowrap}
+.qc:hover .fwd{display:inline-block}
+.qc:hover .nx{display:none}
+.qc.stalled{border-color:#ffc14d99; animation:upulse 1s infinite}
+/* 还没拿到在制名额的票：看得见、但点不动（灰的 + 写"等名额"） */
+.qc.noSlotYet{opacity:.5; border-style:dashed; cursor:not-allowed}
+.qc.noSlotYet .nx{color:var(--dim2)}
+.qc.stalled .fwd{display:inline-block; background:#ffc14d}
+.qc.stalled .nx{display:none}
+.qc.ready{border-color:#5fe08a66; background:#152219}
+.qc.ready .nx{color:var(--ok)}
+.qc.rdy .nx{color:var(--dim2)}
+.st .act{
+  width:100%; text-align:left; background:#20293c; border:1px solid #33405c; color:#dbe4f7;
+  border-radius:11px; padding:9px 10px; cursor:pointer; font-size:12.5px; transition:.12s; min-height:40px;
+  display:flex; align-items:center; gap:8px; overflow:hidden;
+}
+.st .act:hover:not(:disabled){background:#28334b; border-color:#4a5c85}
+.st .act.armed{background:linear-gradient(180deg,#2c3a22,#233018); border-color:#6fae4e; color:#dcffca; box-shadow:0 0 0 3px #5fe08a1a}
+.st .act.armed .k{background:#5fe08a; color:#0d1a10}
+.st .act.warnact{background:linear-gradient(180deg,#3a2a16,#2c2110); border-color:#e0a94e; color:#ffe6bb}
+.st .act:disabled{opacity:.42; cursor:not-allowed}
+.st .act .k{font-size:10px; background:#39465f; border-radius:5px; padding:1px 5px; color:#cfd8ee}
+.st .act .x{margin-left:auto; font-size:10.5px; color:var(--dim2); white-space:nowrap; flex:none}
+.st .act .t{overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0}
+/* 连按/按住的手感：每一下都有回响 + 底部一条攒进度 */
+.st .act .fill{position:absolute; left:0; bottom:0; height:3px; width:0%; background:linear-gradient(90deg,#5fe08a,#ffcf6b); transition:width .06s linear; border-radius:0 0 11px 11px}
+.st .act{position:relative; overflow:hidden}
+.st .act.hit{filter:brightness(1.35)}
+.st.pressed .ic{transform:scale(1.18)}
+.st.pressed{box-shadow:0 0 0 1px #ffcf6b55, 0 0 22px #ffcf6b22 inset}
+.st .hd .cnt{font-size:10px; color:var(--gold); font-weight:700; margin-left:4px}
+.st .hd .kind{font-size:9.5px; color:#8e9bb5; border:1px solid #33405c; border-radius:999px; padding:0 5px; margin-left:4px}
+.st.hot{border-color:#6fae4e99; box-shadow:0 0 0 1px #6fae4e44, 0 0 30px #5fe08a1a inset}
+.st.busy .ic{animation:spin 1.1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.st.drop{border-color:#ffcf6b; box-shadow:0 0 0 2px #ffcf6b55, 0 0 40px #ffcf6b22 inset}
+.st .badge{position:absolute; right:10px; top:10px; font-size:10px; background:#3a2f16; border:1px solid #6b5522; color:#ffe0a3; border-radius:999px; padding:1px 7px}
+.fx{position:absolute; inset:0; pointer-events:none; overflow:hidden; border-radius:16px}
+
+/* ══════════ 工位动作演出（2026-09-27）══════════
+   每个工位右上角放一个"小舞台"：杯子 + 该动作的实物表现。
+   摇 = 杯子真在晃；压缩 = 大锤抡下来把杯子压扁；烤 = 杯底有火；萃 = 茶汤滴进杯子。
+   动画全部走 CSS keyframes（由 .fxact-<id> 类切动作），不依赖 JS 逐帧改样式。
+   ⚠️ 纯装饰：G.fx === false（无头自检/自动截图）时整个舞台不生成。 */
+.fxstage{position:absolute; right:6px; top:34px; width:88px; height:104px; pointer-events:none}
+.fxstage .cupwrap{position:absolute; left:50%; bottom:8px; margin-left:-26px; width:52px; height:66px; transform-origin:50% 100%}
+.fxstage .cup{position:absolute; inset:0; border-radius:5px 5px 12px 12px;
+  background:linear-gradient(180deg,rgba(255,255,255,.30),rgba(255,255,255,.10));
+  border:2.5px solid rgba(255,255,255,.72); box-sizing:border-box; overflow:hidden}
+.fxstage .liq{position:absolute; left:0; right:0; bottom:0; height:0%; border-radius:0 0 10px 10px;
+  background:linear-gradient(180deg,#cfe9ff,#7fc0ee); transition:height .10s linear}
+.fxstage .liq:after{content:""; position:absolute; left:-60%; top:-3px; width:220%; height:7px;
+  background:radial-gradient(circle at 50% 100%,rgba(255,255,255,.85) 42%,transparent 44%) repeat-x;
+  background-size:18px 7px; animation:wavemove 1.4s linear infinite}
+@keyframes wavemove{from{transform:translateX(0)}to{transform:translateX(18px)}}
+
+/* 大锤：从右上抡下来 */
+.fxstage .hammer{position:absolute; right:-26px; top:-4px; width:74px; height:16px;
+  background:linear-gradient(180deg,#e8effb,#96a6c1); border-radius:4px; transform-origin:12% 50%; opacity:0}
+.fxstage .hammer:before{content:""; position:absolute; left:-7px; top:-6px; width:16px; height:28px;
+  background:linear-gradient(180deg,#f2f7ff,#a8b7d0); border-radius:5px}
+.fxstage .hammer:after{content:""; position:absolute; right:-15px; top:-4px; width:28px; height:24px;
+  background:linear-gradient(180deg,#eef4ff,#9fb0ca); border-radius:7px}
+
+/* 杯子晃动（阻尼衰减，像真的被摇） */
+@keyframes cupshake{
+  0%,58%,100%{transform:translateX(0) rotate(0)}
+  62%{transform:translateX(-6px) rotate(-8deg)} 66%{transform:translateX(6px) rotate(8deg)}
+  70%{transform:translateX(-5px) rotate(-6deg)} 74%{transform:translateX(5px) rotate(6deg)}
+  78%{transform:translateX(-3px) rotate(-3deg)} 82%{transform:translateX(3px) rotate(3deg)}
+  86%{transform:translateX(-1px) rotate(-1deg)}}
+/* 锤子抡下 → 杯子压扁 → 白光 + 冲击环 */
+@keyframes hammerSwing{
+  0%{transform:rotate(-72deg);opacity:0} 8%{opacity:1}
+  40%{transform:rotate(-74deg)} 50%{transform:rotate(-6deg)}
+  56%{transform:rotate(0)} 74%{transform:rotate(0);opacity:1} 86%{opacity:0} 100%{opacity:0}}
+@keyframes cupSquash{
+  0%,48%{transform:scaleY(1) scaleX(1)} 54%{transform:scaleY(.74) scaleX(1.16)}
+  62%{transform:scaleY(.84) scaleX(1.08)} 78%{transform:scaleY(1.02) scaleX(.98)} 100%{transform:scaleY(1) scaleX(1)}}
+@keyframes hitFlash{0%,50%{opacity:0} 55%{opacity:.95} 72%{opacity:0} 100%{opacity:0}}
+@keyframes hitRing{0%,50%{opacity:0;transform:scale(.35)} 55%{opacity:.9} 78%{opacity:0;transform:scale(1.6)} 100%{opacity:0}}
+/* 火：杯底火苗跳动 + 杯子发热发亮 */
+@keyframes flameJump{0%,100%{transform:scaleY(1) scaleX(1);opacity:.92} 50%{transform:scaleY(1.32) scaleX(.88);opacity:1}}
+@keyframes cupHeat{0%,100%{filter:brightness(1)} 50%{filter:brightness(1.22) saturate(1.3)}}
+@keyframes steamUp{0%{opacity:0;transform:translate(0,4px) scale(.5)} 18%{opacity:.65} 100%{opacity:0;transform:translate(-10px,-46px) scale(1.4)}}
+/* 茶汤滴下 + 液面涨 + 轻微脉动 */
+@keyframes dripFall{0%,8%{opacity:0;transform:translateY(0)} 20%{opacity:1} 62%{opacity:1;transform:translateY(34px)} 72%{opacity:0;transform:translateY(40px)} 100%{opacity:0}}
+@keyframes brewPulse{0%,100%{transform:scaleY(1)} 50%{transform:scaleY(1.03)}}
+
+/* 各动作的挂载类（由 fxAction 临时加上，动画跑完自动摘掉） */
+.fxstage.act-shake .cupwrap{animation:cupshake 1.5s ease-in-out}
+.fxstage.act-compress .hammer{animation:hammerSwing 1.5s ease-in-out}
+.fxstage.act-compress .cupwrap{animation:cupSquash 1.5s ease-in-out}
+.fxstage.act-compress .flash{animation:hitFlash 1.5s ease-out}
+.fxstage.act-compress .ring{animation:hitRing 1.5s ease-out}
+.fxstage.act-fire .flame{animation:flameJump 1.1s ease-in-out infinite}
+.fxstage.act-fire .cupwrap{animation:cupHeat 2s ease-in-out infinite}
+.fxstage.act-fire .steam{animation:steamUp 2s linear infinite}
+.fxstage.act-brew .drip{animation:dripFall 1.4s ease-in infinite}
+.fxstage.act-brew .cupwrap{animation:brewPulse 1.4s ease-in-out infinite}
+
+/* 舞台内的固定元素 */
+.fxstage .flame{position:absolute; left:50%; bottom:2px; margin-left:-14px; width:28px; height:30px;
+  background:radial-gradient(circle at 50% 78%,#fff6c0,#ffa13c 46%,rgba(255,90,0,0) 72%);
+  border-radius:50% 50% 42% 42%; opacity:0}
+.fxstage .steam{position:absolute; left:50%; bottom:58px; margin-left:-5px; width:10px; height:10px;
+  border-radius:50%; background:rgba(255,255,255,.55); filter:blur(3px); opacity:0}
+.fxstage .steam.s2{animation-delay:.6s; margin-left:-14px}
+.fxstage .drip{position:absolute; left:50%; top:2px; margin-left:-2px; width:4px; height:11px;
+  border-radius:3px; background:#a9e5c6; opacity:0}
+.fxstage .flash{position:absolute; inset:-10px; border-radius:50%;
+  background:radial-gradient(circle at 50% 62%,rgba(255,239,170,.95),rgba(255,150,40,0) 60%); opacity:0}
+.fxstage .ring{position:absolute; left:50%; bottom:16px; margin-left:-38px; width:76px; height:76px;
+  border-radius:50%; border:3px solid rgba(190,225,255,.85); opacity:0}
+.fxstage .label{position:absolute; left:0; right:0; bottom:-4px; text-align:center; font-size:9.5px;
+  color:#cfe0ff; text-shadow:0 1px 2px #000; letter-spacing:.5px}
+.fxstage.idle{opacity:.30}
+
+/* 打包台：小票横着排，一行一张，别把按钮挤出去 */
+#pack .queue{flex-direction:row; flex-wrap:wrap; align-content:flex-start; margin:8px 0; max-height:72px}
+#pack .queue .qc{flex:0 0 auto; max-width:230px}
+#pack .queue .qc .d{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+#pack .queue .qc .nx{white-space:nowrap}
+
+/* 窄屏（手机/小窗）：中间工位塌成一列 —— 保证手机上也能玩 */
+@media (max-width:1180px){
+  #stage{grid-template-columns:1fr; height:auto; overflow-y:auto}
+  body{overflow:auto}
+  #stations{grid-template-rows:repeat(4,minmax(150px,auto))}
+  #top{flex-wrap:wrap; gap:8px}
+  .clock{min-width:auto; text-align:left}
+  #orders{max-height:32vh}
+  #book{max-height:34vh}
+}
+
+#slip{
+  position:fixed; z-index:50; pointer-events:none; display:none; transform:translate(-50%,-50%) rotate(-3deg) scale(.94);
+  background:#f3ecd8; color:#2a2418; border-radius:8px; padding:7px 10px; font-size:12px; font-weight:700;
+  box-shadow:0 14px 30px #000a; max-width:230px; border:1px dashed #b9a97e;
+}
+#slip .s{font-weight:400; font-size:10.5px; color:#6b5f45; margin-top:2px}
+#ghostCursor{position:fixed; z-index:49; width:26px;height:26px;border-radius:50%;border:2px solid #ffcf6b; pointer-events:none; display:none; transform:translate(-50%,-50%)}
+#ghostCursor::after{content:"";position:absolute;inset:5px;border-radius:50%;background:#ffcf6b55}
+
+/* ---------- 中央提示条 ---------- */
+#hint{
+  padding:8px 12px; font-size:12px; color:#c9d4ec; background:linear-gradient(90deg,#1d2434,#1a2030);
+  border:1px solid var(--line); border-radius:12px; display:flex; align-items:center; gap:9px;
+}
+#hint b{color:var(--gold)}
+#hint .live{margin-left:auto; font-size:11px; color:var(--dim2); font-variant-numeric:tabular-nums}
+
+/* ---------- 配方手册 ---------- */
+#book{flex:1; overflow-y:auto; padding:9px; display:flex; flex-direction:column; gap:7px}
+#book::-webkit-scrollbar{width:8px} #book::-webkit-scrollbar-thumb{background:#2b344c;border-radius:8px}
+.rec{background:#161c29; border:1px solid #2b344c; border-radius:11px; padding:8px 9px; cursor:pointer; transition:.12s}
+.rec:hover{border-color:#4a5c85; transform:translateY(-1px)}
+.rec.sel{border-color:#ff5e6c99; box-shadow:0 0 0 3px #ff5e6c1a}
+.rec .t{font-weight:800; font-size:12.5px; display:flex; gap:6px; align-items:center; color:#fff}
+.rec .t .pr{margin-left:auto; font-size:11px; color:var(--gold); font-weight:700}
+.rec .flow{display:flex; gap:3px; margin:6px 0 5px; flex-wrap:wrap}
+.chip{font-size:9.5px; background:#222c40; border:1px solid #33405c; border-radius:5px; padding:1px 5px; color:#b9c6e2}
+.chip .s{color:#66748f}
+.rec .steps{font-size:10.5px; color:var(--dim); line-height:1.65; white-space:pre-wrap}
+.rec .steps i{color:#8e9bb5; font-style:normal}
+.rec .steps u{color:#ffd08a; text-decoration:none}
+.rec .foot{display:flex; gap:6px; margin-top:6px; font-size:10px; color:var(--dim2)}
+.diff{color:#ff9aa4} .dif1{color:#a8f0c4} .dif2{color:#ffe0a3}
+
+/* ---------- 开局面板 / 结算 ---------- */
+.veil{position:fixed; inset:0; z-index:60; background:#080a0fd9; backdrop-filter:blur(6px); display:grid; place-items:center}
+.panel{
+  width:min(680px,92vw); max-height:88vh; overflow:auto; background:linear-gradient(180deg,#1b2231,#141926);
+  border:1px solid #36426a; border-radius:20px; padding:22px 24px; box-shadow:0 30px 80px #000b;
+}
+.panel h1{margin:0 0 4px; font-size:23px; letter-spacing:.5px}
+.panel h1 em{font-style:normal; color:var(--snow); text-shadow:0 0 22px #ff5e6c55}
+.panel p{color:var(--dim); font-size:12.5px; margin:6px 0}
+.modes{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin:16px 0 8px}
+.mode{background:#151b28; border:1px solid #2f3a56; border-radius:14px; padding:14px; cursor:pointer; transition:.15s}
+.mode:hover{border-color:#ff5e6c88; transform:translateY(-2px)}
+.mode.sel{border-color:#ff5e6c; box-shadow:0 0 0 3px #ff5e6c22}
+.mode b{font-size:15px} .mode .m{font-size:11.5px; color:var(--dim2); margin-top:3px}
+.mode .big{font-size:26px; font-weight:800; color:#fff; font-variant-numeric:tabular-nums}
+.rules{font-size:11.5px; color:var(--dim2); line-height:1.9; margin-top:12px; border-top:1px dashed #2b344c; padding-top:12px}
+.rules kbd{background:#2a3348; border:1px solid #3a4763; border-radius:4px; padding:0 4px; font-size:10px; color:#cfd8ee}
+.sum{display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin:14px 0}
+.sum div{background:#151b28; border:1px solid #2f3a56; border-radius:12px; padding:10px 12px}
+.sum b{display:block; font-size:20px; font-variant-numeric:tabular-nums}
+.sum span{font-size:11px; color:var(--dim2)}
+.rankbox{text-align:center; margin:8px 0 2px}
+.rankbox .rk{font-size:44px; font-weight:900; color:var(--gold); text-shadow:0 0 30px #ffcf6b55}
+.tagline{font-size:12px; color:var(--dim); font-style:italic}
+
+/* ---------- 吐司 ---------- */
+#toasts{position:fixed; left:50%; bottom:26px; transform:translateX(-50%); z-index:55; display:flex; flex-direction:column; gap:6px; align-items:center; pointer-events:none; max-width:min(700px,72vw)}
+.toast{
+  background:#1d2537ee; border:1px solid #3a4763; color:#e6ecfb; padding:6px 12px; border-radius:999px;
+  font-size:12px; box-shadow:0 10px 30px #0008; animation:tin .25s; max-width:100%;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.toast.err{border-color:#ff6b6b88; background:#2a161aee; color:#ffd7d7}
+.toast.ok{border-color:#5fe08a88; background:#14251bee; color:#d6ffe6}
+.toast.gold{border-color:#ffcf6b88; background:#2a2413ee; color:#ffeec9}
+@keyframes tin{from{transform:translateY(10px); opacity:0}}
+
+/* 特效：完成一步 */
+.pop{position:fixed; z-index:48; pointer-events:none; font-weight:900; font-size:15px; animation:pop .7s forwards; text-shadow:0 2px 8px #000a}
+@keyframes pop{0%{transform:translate(-50%,-50%) scale(.6); opacity:0} 25%{transform:translate(-50%,-70%) scale(1.15); opacity:1} 100%{transform:translate(-50%,-140%) scale(1); opacity:0}}
+.shake{animation:shk .35s}
+@keyframes shk{0%,100%{transform:translate(0,0)}20%{transform:translate(-4px,2px)}40%{transform:translate(4px,-2px)}60%{transform:translate(-3px,-2px)}80%{transform:translate(3px,2px)}}
+#flash{position:fixed;inset:0;z-index:47;pointer-events:none;opacity:0;transition:opacity .25s}
+</style>
+</head>
+<body>
+
+<div id="top">
+  <div class="brand"><b>雪皇的后厨</b><span>荒诞饮品模拟器 · 单文件原型</span><span class="ver">v0.3 · 自动出票 + 自动流转</span></div>
+  <div id="daybar"></div>
+  <div class="clock" id="clock">
+    <div class="now" id="clk">00:00</div>
+    <div class="sub" id="clksub">第 1 天 / 共 5 天</div>
+  </div>
+  <button class="btn" id="btnTicket">自动出小票：开 <span style="opacity:.6">S</span></button>
+  <button class="btn" id="btnAuto">小票自动流转：开 <span style="opacity:.6">A</span></button>
+  <button class="btn" id="btnPause">暂停 <span style="opacity:.6">Esc</span></button>
+  <button class="btn" id="btnRestart">重开 <span style="opacity:.6">R</span></button>
+</div>
+
+<div id="stage">
+  <!-- 左：订单 -->
+  <div class="col">
+    <div class="card" style="flex:1; display:flex; flex-direction:column; min-height:0">
+      <div class="ctitle">🧾 后厨 / 等候区 <span class="n" id="orderCount">0 位</span></div>
+      <div id="orders"></div>
+    </div>
+    <div class="card">
+      <div class="ctitle">📈 营业数据</div>
+      <div style="padding:10px 12px; font-size:12px; color:var(--dim); display:grid; gap:6px">
+        <div style="display:flex;justify-content:space-between"><span>营业额</span><b id="sMoney" style="color:var(--gold)">¥0</b></div>
+        <div style="display:flex;justify-content:space-between"><span>今日房租</span><b id="sRent" style="color:var(--snow2)">¥0</b></div>
+        <div style="display:flex;justify-content:space-between"><span>已出餐</span><b id="sServed" style="color:var(--ok)">0 杯</b></div>
+        <div style="display:flex;justify-content:space-between"><span>翻车 / 流失</span><b id="sBad" style="color:var(--bad)">0 / 0</b></div>
+        <div style="display:flex;justify-content:space-between"><span>连击</span><b id="sCombo" style="color:var(--cream)">x0</b></div>
+        <div style="display:flex;justify-content:space-between"><span>小票自动流转</span><b id="sAuto" style="color:var(--ok)">开</b></div>
+        <div style="display:flex;justify-content:space-between"><span>后厨容量</span><b id="sKitchen" style="color:var(--cream)">0 / 3 单</b></div>
+        <div style="display:flex;justify-content:space-between"><span>到店间隔</span><b id="sArrive" style="color:var(--dim)">—</b></div>
+        <div style="display:flex;justify-content:space-between"><span>排队等跑的</span><b id="sLeftWait" style="color:var(--bad)">0 位</b></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 中：工位 -->
+  <div class="col">
+    <div id="hint">
+      <span>小票会<b>自动流转</b>（<b>A</b> 键开关）→ 点工位上的绿色按钮完成这一步（<b>B</b> 捣 / <b>H</b> 火 / <b>C</b> 化 / <b>P</b> 泡）→ 全绿后自动进 <b>打包台</b>，按 <b>空格</b> 出餐。想抢速度就把小票直接拖到工位。</span>
+      <span class="live" id="live"></span>
+    </div>
+    <div id="stations">
+      <div class="st" data-st="shake">
+        <div class="hd"><div class="ic">🧊</div><div class="nm">捣锤区</div><div class="key">B 捣</div></div>
+        <div class="desc">捣、摇、压缩、取冰</div>
+        <div class="queue" data-q="shake"></div>
+        <button class="act" data-act="shake"><span class="k">B</span><span class="t">等待小票</span><span class="x"></span><span class="fill"></span></button>
+        <div class="fx"></div>
+      </div>
+      <div class="st" data-st="fire">
+        <div class="hd"><div class="ic">🔥</div><div class="nm">火系区</div><div class="key">H 火</div></div>
+        <div class="desc">喷火、烤香、掏甜筒（枪筒）</div>
+        <div class="queue" data-q="fire"></div>
+        <button class="act" data-act="fire"><span class="k">H</span><span class="t">等待小票</span><span class="x"></span><span class="fill"></span></button>
+        <div class="fx"></div>
+      </div>
+      <div class="st" data-st="chem">
+        <div class="hd"><div class="ic">🧪</div><div class="nm">化学区</div><div class="key">C 化</div></div>
+        <div class="desc">量筒、容量瓶、滴管</div>
+        <div class="queue" data-q="chem"></div>
+        <button class="act" data-act="chem"><span class="k">C</span><span class="t">等待小票</span><span class="x"></span><span class="fill"></span></button>
+        <div class="fx"></div>
+      </div>
+      <div class="st" data-st="brew">
+        <div class="hd"><div class="ic">🍵</div><div class="nm">萃茶区</div><div class="key">P 泡</div></div>
+        <div class="desc">泡茶、现萃、捞蟠桃</div>
+        <div class="queue" data-q="brew"></div>
+        <button class="act" data-act="brew"><span class="k">P</span><span class="t">等待小票</span><span class="x"></span><span class="fill"></span></button>
+        <div class="fx"></div>
+      </div>
+      <div class="st" data-st="pack" id="pack" style="grid-column:1 / -1">
+        <div class="hd"><div class="ic">🛍️</div><div class="nm">打包台</div><div class="key">空格</div>
+          <div class="badge" id="rdyBadge" style="display:none">可出餐 0</div></div>
+        <div class="desc">封杯、贴标、喊单（出餐越快，评分越高）</div>
+        <div class="queue" data-q="pack" style="flex-direction:row; flex-wrap:wrap"></div>
+        <button class="act" data-act="pack"><span class="k">␣</span><span class="t">等待小票</span><span class="x"></span><span class="fill"></span></button>
+        <div class="fx"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 右：配方手册 -->
+  <div class="col">
+    <div class="card" style="flex:1; display:flex; flex-direction:column; min-height:0">
+      <div class="ctitle">📖 产品手册 <span class="tip">点一条起杯 · 键 1~8（关掉自动出票后）</span></div>
+      <div id="book"></div>
+    </div>
+    <div class="card">
+      <div class="ctitle">⌨️ 快捷键</div>
+      <div style="padding:10px 12px; font-size:11.5px; color:var(--dim); line-height:2">
+        <kbd>B</kbd> 捣锤区 · <kbd>H</kbd> 火系区 · <kbd>C</kbd> 化学区 · <kbd>P</kbd> 萃茶区<br>
+        <kbd>空格</kbd> 打包台出餐 · <kbd>A</kbd> 自动流转 · <kbd>S</kbd> 自动出小票<br>
+        <kbd>Esc</kbd> 暂停 · <kbd>R</kbd> 重开（结算后）· <kbd>1</kbd>~<kbd>8</kbd> 手动起杯
+        <div style="margin-top:8px; padding-top:8px; border-top:1px dashed #2b344c; color:var(--dim2)">
+          调试（默认开，<kbd>F2</kbd> 切 / URL 加 <code>?debug=0</code> 关）：<kbd>9</kbd> 营业额 +500 · <kbd>0</kbd> 快进到收盘并清客
+        </div>
+        <div style="margin-top:8px; padding-top:8px; border-top:1px dashed #2b344c; color:var(--dim2)">
+          命名逻辑：工位键取<b>动作字</b>（捣/火/化/泡），不取屏幕位置 —— 记一个词就够，不用背 QWER。
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="slip"><span id="slipT"></span><div class="s" id="slipS"></div></div>
+<div id="ghostCursor"></div>
+<div id="toasts"></div>
+<div id="flash"></div>
+
+<script>
+"use strict";
+/* =======================================================================
+   雪皇的后厨 · 荒诞饮品模拟器（网页版原型）
+   设计依据：策划案「核心理念 / 随机点单 / 小票贴纸 / 官方恶搞产品 / 5天时间机制」
+   一切数值集中在 CFG / RECIPES 里，改这两块就能调平衡。
+   ======================================================================= */
+
+/* ---------------- 0. 调试开关（临时，正式版删掉） ----------------
+   `9` = 营业额 +¥500    `0` = 快进到当天最后 10 秒并清空顾客
+   默认**开着**（临时）；要关就加 ?debug=0，或者按 F2 现场切换。
+   全文件搜 `DEBUG` 就能连根删掉这一套（开关 / F2 / 两个键 / 右侧说明各一处）。 */
+let DEBUG_KEYS = !/[?&]debug=0/.test((typeof location === 'object' && location.search) || '');
+function DEBUG(tag, msg){ toast(`[${tag}] ${msg}`, 'gold'); }
+
+/* ---------------- 1. 配置（唯一数字来源） ---------------- */
+const CFG = {
+  days: 5,
+  // 时间：每个模式自带"几天 / 每天多久" —— 总时长 = days × perDay。
+  //   arriveScale = 这一盘的"人数密度"（1 = 基准）。短盘时间少，所以把人数也降下来，
+  //   否则"更短的时间塞同样多的人"只是更赶，不是更好玩。
+  //   quick = 5 分钟**一口气一天**（不是 5 个 1 分钟）：没有每天的结算打断，适合单人快打。
+  modes: {
+    quick: { days: 1, total: 300,  label: '5 分钟局',  perDay: 300, arriveScale: 1.45, desc: '一口气经营 5 分钟 · 单人快打，客人更稀' },
+    fast:  { days: 5, total: 600,  label: '10 分钟局', perDay: 120, arriveScale: 1,    desc: '每天 2 分钟 · 适合碎片化' },
+    slow:  { days: 5, total: 1200, label: '20 分钟局', perDay: 240, arriveScale: 1,    desc: '每天 4 分钟 · 沉浸式经营' }
+  },
+  // 时间流速动态调整：订单积压→慢，空闲→快；长期均值 ≈1，所以总时长仍锁在 10/20 分钟
+  flow: { base: 0.85, backlogGain: 0.05, backlogMax: 6, idleBonus: 0.4, idleAfter: 8, min: 0.5, max: 1.6 },
+  // 随机点单（完全严肃、可预期）
+  cups:   [ {n:1,p:.5}, {n:2,p:.25}, {n:3,p:.125}, {n:4,p:.125} ],
+  ice:    [ {v:'正常',p:.75,cls:'ice'}, {v:'去冰',p:.125,cls:'ice'}, {v:'常温',p:.125,cls:'ice'} ],
+  sugar:  [ {v:'正常糖',p:.75,cls:'sug'}, {v:'七分糖',p:.125,cls:'sug'}, {v:'五分糖',p:.125,cls:'sug'} ],
+  // 到店间隔（秒）：每次都在 [min,max] 里随机 → 到店时间天然是动态的；
+  // dayScale 每天收紧一档（客人越到后面越密），再乘一点随机抖动。
+  // ★ 2026-09-26 调过一次：**只把"人"调稀**（7~12.5s/每天×0.9 → 10~18s/每天×0.95），
+  //   一单几杯、耐心、连击惩罚、在制名额这些**都没动**。原因：原来一局要出 135 杯，
+  //   而人手的产能大约 70 杯，需求是人手的两倍 ⇒ 全程被追着跑，"累"。
+  //   现在一局约 80 杯，仍然会占满 3 个在制名额（还是忙），但不再是无止境地追。
+  // ★ 再调一次：上一条调狠了，玩家反馈"有点闲" → 从 10~18s 收到 8~14s（约 100 杯/局）。
+  arrive: { first: 2.5, min: 8, max: 14, dayScale: 0.95, jitter: 0.2 },
+  // 每天收尾：快打烊时**客人来得越来越稀**，到点就关门不再放人进来。
+  //   然后进入"打烊清场"：手上剩下的单必须做完（这段时间不进倒计时），做完才出当日结算页；
+  //   graceSec 是硬上限 —— 超了就不等了，剩下的算流失（否则手慢会永远卡在打烊里）。
+  closing: { rampFrom: 0.35, rampTo: 4, graceSec: 45 },
+  // 耐心（秒）：★ 按这一单**点的杯数**动态给 —— 一次点 4 杯的客人本来就打算等，
+  // 而且他占后厨一个名额更久、还更容易被排队挤到，所以杯数越多给得越宽：
+  //   1 杯 ≈ 50s · 2 杯 ≈ 62s · 3 杯 ≈ 74s · 4 杯 ≈ 86s（再乘 0.85~1.15 的个体抖动）
+  // 排队的人**也吃耐心**，只是掉得慢（waitDrain）——排队不是免费的，但也没在做的那么急。
+  patience: { base: 38, perCup: 12, min: 26, jitter: 0.15,
+    // 每做完一杯给客人续的耐心（★ 见 onCupMade：这一版是"全做完一起交"，等待更久，
+    // 所以用"看得见的进度"补偿等待 —— 做完一杯，耐心回一口）
+    doneBonus: 3,           // 基础：做完一杯就回这么多秒
+    perStep: 0.4,           // 再加：这杯一共几步 × 0.4
+    doneBonusMax: 8,        // 单杯最多续这么多秒（防止重活把耐心直接回满）
+    waitDrain: 0.6, readyDrain: 0.35 },
+  stallWarn: 6,                                             // 小票多久没人接就闪
+  // 小票自动流转（按 T 切）：小票闲够 after 秒没人接，就自己走到下一步该去的工位。
+  // 关掉它 = 每张票都得你亲手拖/点（硬核模式）；开着也保留拖拽，抢速度用。
+  auto: { on: true, after: 5 },
+  // 后厨容量：**同时最多 3 个未完成的任务（= 3 张小票 / 3 杯在制）**。
+  // 「一单」可以有多杯，所以是"3 杯在制"而不是"3 单"——多出来的小票不许开工，先在等候区排队。
+  kitchen: { maxWip: 3, maxWaiting: 10 },
+  // 自动出小票（按 S 切）：客人一进后厨，这单的每一杯立刻生成小票（不用再点手册起杯）。
+  autoTicket: { on: true, maxPerOrder: 8 },
+  money: { perCup: 26, rushBonus: 12, strikePenalty: 18, leavePenalty: 30, comboStep: 2, comboMax: 30 },
+  // 房租：每天固定 ¥100（原来 200 + 每天涨 140，十天下来贵得离谱、而"付不出"又没有任何后果）。
+  // ★ debtPenalty：**付不出就欠着**，欠款从最终结算里扣、并按每 100 元降一档评级 ——
+  //   这样房租才是真的"落到实处"（不交就有代价），而不是记一行差评就过去了。
+  rent:  { perDay: 100, debtPenalty: 1, debtPerRank: 100 },
+  score: { perCup: 100, rushBonus: 40, mistake: 60, leave: 80, flowWeight: 0.8 },
+  serveAnim: 0.55
+};
+
+/* ---------------- 2. 工位 ----------------
+   快捷键的命名逻辑：**助记字母**，键位跟着"这一步在干什么"走，不跟着屏幕位置走。
+     B = 捣（捣锤区）  H = 火（火系区）  C = 化（化学区）  P = 泡（萃茶区）  ␣ = 打包/出餐
+   为什么不用 Q/W/E/R：那是上一版沿用的射击游戏手感键，跟工位名毫无关系，学的时候得靠背。
+   助记字母的问题是"2×2 摆位和字母顺序不一致"，解法是把工位按 B→H→C→P 的阅读顺序摆，
+   而不是反过来把字母凑成 QWER。 */
+const STATIONS = [
+  { id:'shake', name:'捣锤区', icon:'🧊', key:'B', mnemonic:'捣', color:'#7ee0ff', verbs:['捣','摇','压','取'] },
+  { id:'fire',  name:'火系区', icon:'🔥', key:'H', mnemonic:'火', color:'#ff9a4d', verbs:['喷','烫'] },
+  { id:'chem',  name:'化学区', icon:'🧪', key:'C', mnemonic:'化', color:'#c9a7ff', verbs:['取','移','定容','摇'] },
+  { id:'brew',  name:'萃茶区', icon:'🍵', key:'P', mnemonic:'泡', color:'#8ee08a', verbs:['泡','萃','捞'] },
+  { id:'pack',  name:'打包台', icon:'🛍️', key:'␣', mnemonic:'打包', color:'#ffcf6b', verbs:['封','送'] }
+];
+// 工位快捷键表：**只在这里写一次**（键位与工位的唯一映射源，改键位只改这一行）
+const STATION_KEYS = Object.fromEntries(STATIONS.filter(s => s.id !== 'pack').map(s => [s.key.toLowerCase(), s.id]));
+const KEY_PACK = ' ';
+const S = Object.fromEntries(STATIONS.map(s => [s.id, s]));
+
+/* ---------------- 3. 产品（名字离谱，步骤在游戏里全都做得到） ---------------- */
+const RECIPES = [
+  { id:'dryice', name:'干冰干柠檬水', emo:'🧊', price:30, diff:2, source:'官方', zk:'#3a6f8f',
+    steps:[
+      { st:'brew',  t:'放入干柠檬片' },
+      { st:'brew',  t:'加水至七分满' },
+      { st:'shake', t:'双手握住杯子' },
+      { st:'shake', t:'快速压缩内部空气至 25000 千帕' },
+      { st:'shake', t:'继续压缩，直至出现固态干冰' },
+      { st:'pack',  t:'封杯出餐' }
+    ]},
+  // ★ 白芝麻火麒麟 = neta 现实里的「黑芝麻冰麒麟」（黑→白、冰→火、雪糕→辣甜筒，麒麟不变）。
+  //   定位：**快消品** —— 工序只有"掏枪筒 + 喷火"两件事，喷完直接递给客人，不进打包台。
+  //   为什么合理：它本质是**一支甜筒**，不是杯装饮料 —— 没有封杯这回事，
+  //   所以不需要铺芝麻/加辣椒精/加冰/注入茶汤那些茶饮工序（那些是"杯装"才需要的）。
+  //   恶搞道具「枪筒」不新开分区，就放在**火系区**（喷火枪本来就在那儿）。
+  { id:'qilin', name:'白芝麻火麒麟', emo:'🍦', price:32, diff:1, source:'官方', zk:'#8f3a2a',
+    serveNow:true,                                   // 做完即出：喷完就递给客人（不用打包）
+    steps:[
+      { st:'fire', t:'从"枪筒"里掏出甜筒（枪筒是一种恶搞的甜筒）' },
+      { st:'fire', t:'用喷火枪烤香，烤完直接递给客人（甜筒不用打包）' }
+    ]},
+  { id:'bromine', name:'空杯满杯千溴水', emo:'🧪', price:44, diff:3, source:'官方', zk:'#6a3a8f',
+    steps:[
+      { st:'chem',  t:'用量筒取 10ml 溴水原液' },
+      { st:'chem',  t:'移入容量瓶' },
+      { st:'chem',  t:'滴管定容至刻度' },
+      { st:'chem',  t:'摇匀' },
+      { st:'shake', t:'倒入空杯' },
+      { st:'pack',  t:'封杯出餐' }
+    ]},
+  { id:'instcoffee', name:'现萃速溶咖啡', emo:'☕', price:28, diff:1, source:'官方', zk:'#6b4a2a',
+    steps:[
+      { st:'brew',  t:'取速溶咖啡粉' },
+      { st:'brew',  t:'放入咖啡机粉碗' },
+      { st:'brew',  t:'按下萃取键' },
+      { st:'pack',  t:'30 秒后得到「现萃的速溶咖啡」，封杯出餐' }
+    ]},
+  { id:'newton', name:'牛顿苹果奶绿', emo:'🍏', price:34, diff:2, source:'官方', zk:'#2a7a4a',
+    steps:[
+      { st:'brew',  t:'制作奶绿' },
+      { st:'brew',  t:'从地上捡起掉落的苹果' },
+      { st:'shake', t:'擦一擦，切片放入' },
+      { st:'brew',  t:'默念牛顿定律' },
+      { st:'pack',  t:'封杯出餐' }
+    ]},
+  { id:'peach', name:'蟠桃四季春', emo:'🍑', price:42, diff:3, source:'官方', zk:'#8f2a5a',
+    steps:[
+      { st:'brew',  t:'打开「天庭贡品」冷库' },
+      { st:'brew',  t:'取出存放四年的蟠桃' },
+      { st:'shake', t:'切片（切片时有金光溢出，正常现象）' },
+      { st:'brew',  t:'加入四季春茶汤' },
+      { st:'pack',  t:'封杯出餐' }
+    ]},
+  /* —— 以下为「产品工坊」风格的玩家自定义示例，验证 UGC 元素组合的可行性 —— */
+  { id:'ugc1', name:'四年陈酿喷火柠檬茶', emo:'🥤', price:36, diff:2, source:'工坊', zk:'#7a6a2a',
+    steps:[
+      { st:'brew',  t:'四年陈酿柠檬片下杯' },
+      { st:'fire',  t:'喷火枪烤香' },
+      { st:'shake', t:'猛摇 8 下' },
+      { st:'shake', t:'加满冰' },
+      { st:'pack',  t:'封杯出餐' }
+    ]},
+  { id:'ugc2', name:'定容式干冰四季春', emo:'⚗️', price:40, diff:3, source:'工坊', zk:'#3a7a7a',
+    steps:[
+      { st:'chem',  t:'滴管定容至 250ml 刻度' },
+      { st:'brew',  t:'注入四季春' },
+      { st:'shake', t:'压缩至固态干冰' },
+      { st:'pack',  t:'封杯出餐' }
+    ]}
+];
+
+/* ---------------- 3.5 手感：不同动作 = 不同手法（不是全都连点） ----------------
+   设计意图（策划案："恶搞在表层、操作要真实"）：现实里这几种活儿的手感本来就不一样 ——
+     · 取 / 放 / 捡 / 按下    → **一下就完**（tap）
+     · 倒 / 注入 / 定容 / 切片 → **按住不放，看着它涨**（hold）：像真的在倒，松手就停
+     · 捣 / 压缩 / 猛摇 / 喷火 → **连按几下**（mash）：每一下都出力，有进度条和震屏
+   所以配方之间节奏会被拉开：现萃速溶咖啡是"三下就完的流水线"，干冰干柠檬水要实打实按五下。
+   没做统一化 —— 统一成连点只会把"点击"变成"点击次数"。
+   实现只动两个地方：这里定手法，pressStep 按手法收口。 */
+const HOLD_SEC = 0.9;                        // 按住类：攒够这么久就算做完
+let STEP_UID = 0;
+const MASH_PAT = /压缩|猛摇|捣|棒打|用力|摇匀|喷火|烤香|继续|直至|反复/;
+const HOLD_PAT = /倒入|注入|加水|加满|铺|切片|定容|萃取|捞|倒入空杯/;
+const TAP_PAT  = /取|放入|加入|移入|捡|按下|默念|擦|封杯|打开|得到/;
+function kindFor(text, st, id){
+  // 快节奏配方整条线走"轻手法"：现萃速溶咖啡（3 次操作）不要连点，不然一杯咖啡按到烦
+  if(id === 'instcoffee') return 'tap';
+  if(st === 'pack') return 'tap';
+  const T = String(text);
+  if(/继续|直至|反复/.test(T)) return 'mash';        // 明说"一直弄到出现XXX"的，就该出力
+  if(TAP_PAT.test(T) && !MASH_PAT.test(T)) return 'tap';
+  if(MASH_PAT.test(T)) return 'mash';
+  if(HOLD_PAT.test(T)) return 'hold';
+  return 'tap';
+}
+function tapsFor(text, st, kind){
+  if(kind === 'tap') return 1;
+  if(kind === 'hold') return 0;                      // 按住类不看次数，看按住时长
+  const T = String(text);
+  if(/继续|直至|反复/.test(T)) return 6;
+  if(/压缩|猛摇|捣|棒打|用力/.test(T)) return 5;
+  return 4;                                          // 摇匀 / 喷火 / 烤香
+}
+const KIND_LABEL = { tap: '', mash: '连按', hold: '按住' };
+// 只把这些"纯手感"的步骤设成不占名额：按配方点名，不按正则瞎猜（避免误伤别家的步骤）
+const NO_SLOT_STEPS = new Set([
+  'instcoffee::取速溶咖啡粉',
+  'instcoffee::放入咖啡机粉碗',
+  'instcoffee::按下萃取键',
+]);
+for(const r of RECIPES){
+  for(const s of r.steps){
+    s.uid = ++STEP_UID;
+    s.kind = kindFor(s.t, s.st, r.id);
+    s.taps = tapsFor(s.t, s.st, s.kind);
+    s.done = 0;                                      // 这一手法已经积累的量（mash：几下；hold：秒）
+    s.ok = false;                                    // 这一步是否收口
+    s.noSlot = NO_SLOT_STEPS.has(`${r.id}::${s.t}`); // 不占后厨名额（见 refreshSlots 顶部注释）
+  }
+}
+// 这一步还差多少（HUD 与测试都读它）
+function tapsLeft(step){ return step ? Math.max(0, (step.taps || 1) - (step.done || 0)) : 0; }
+// 这一步的完成度 0~1（画进度用）
+function stepFrac(step){
+  if(!step) return 0;
+  if(step.kind === 'hold') return Math.min(1, (step.done || 0) / HOLD_SEC);
+  return Math.min(1, (step.done || 0) / (step.taps || 1));
+}
+
+/* ---------------- 4. 顾客台词（恶搞处） ---------------- */
+const NAMES = ['隔壁老王','雪皇本尊','柠檬精','干冰爱好者','不喝冰的阿姨','物理系学弟','牛顿本人','后厨实习生','挑剔的美食家','加班到凌晨的人','一杯就倒','四杯打包'];
+const LINES = {
+  ok:  ['下次还来！','这杯我记住名字了。','离谱，但好喝。','后厨辛苦了。','绝了，我要发朋友圈。'],
+  slow:['就这？我等得冰都化了。','你们后厨是不是在修仙？','算了，勉强喝吧。'],
+  err: ['这杯……是给别人做的吧？','味道不对，我要退货！','你是不是把干冰当糖加了？']
+};
+
+/* ---------------- 5. 工具 ---------------- */
+const rnd = (a,b) => a + Math.random()*(b-a);
+function pick(table){
+  const r = Math.random(); let acc = 0;
+  for(const it of table){ acc += it.p; if(r < acc) return it; }
+  return table[table.length-1];
+}
+const $  = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const fmt = t => { t = Math.max(0, Math.ceil(t)); return String(Math.floor(t/60)).padStart(2,'0') + ':' + String(t%60).padStart(2,'0'); };
+const byId = id => RECIPES.find(r => r.id === id);
+
+/* ---------------- 6. 游戏状态 ---------------- */
+let G = null;
+function newGame(modeKey){
+  const m = CFG.modes[modeKey];
+  G = {
+    mode: modeKey, modeCfg: m,
+    running: false, ended: false,
+    day: 1, phase: 'open',        // open（营业中）| closing（打烊清场，耐心冻结）| done
+    dayLeft: m.perDay, totalLeft: m.total, elapsed: 0, realElapsed: 0,
+    flow: 1, backlog: 0, idle: 0,
+    money: 0, rentPaid: 0, rentDebt: 0, served: 0, mistakes: 0, left: 0,
+    score: 0, combo: 0, maxCombo: 0,
+    orders: [], slips: [], cid: 0, oid: 0,
+    auto: CFG.auto.on,             // 小票自动流转（T 键切换）
+    autoTicket: CFG.autoTicket.on, // 进单自动出小票（Y 键切换）
+    autoMoves: 0,                  // 自动流转次数（记在数据里，自检/日报能看到）
+    leftWaiting: 0,                // 排队排到没耐心走掉的人数（日报里能区分"没做"和"没轮到"）
+    nextArrive: CFG.arrive.first,
+    lastCallDay: 0,                // "最后接单"提示只在当天弹一次
+    closingLeft: 0,                // 打烊清场的剩余时间（硬上限，见 CFG.closing.graceSec）
+    _settling: false,              // 正在出当日结算页（防止 tick 每帧重复结算）
+    _settledDay: 0,                // 已经结算过哪一天（幂等闸）
+    _dayPanelNext: null,           // 当日结算页的"继续"动作（空格键也走它）
+    arriveLog: [],                 // 到店间隔记录（自检用：确认"动态变化 + 逐日收紧"）
+    dayStats: [], today: { served:0, money:0, left:0, mistakes:0 },
+    log: []
+  };
+  renderBook();
+}
+
+/* ---------------- 7. 点单：完全严肃、稳定、可预期 ----------------
+   ★ 一单可以点**多种不同的饮品**，也可以**同一种点好几杯**（混点）。
+     所以订单不再等于"一个配方"，而是 lines = [{ rec, n }, ...]；need = 总杯数。
+     每杯仍然是**独立小票、独立任务**（一杯一票 / 在制 ≤3 / 排队 这些规矩一条都不用改）。 */
+// 重活配方（要连按十几下的）。白芝麻火麒麟改成"快消两步骤"后从这里移除，现在只剩干冰
+const HEAVY_RECIPES = new Set(['dryice']);
+function drinkPlan(cupN){
+  const pool = RECIPES.slice();
+  const lines = [];
+  let left = cupN;
+  let kinds = 1;
+  if(cupN >= 2){
+    const mixedChance = cupN === 2 ? 0.5 : 0.65;      // 2 杯一半概率混，3~4 杯多半混
+    kinds = Math.random() < mixedChance ? (cupN >= 3 && Math.random() < 0.5 ? 3 : 2) : 1;
+    kinds = Math.min(kinds, cupN, pool.length);
+  }
+  if(kinds === 1){ lines.push({ rec: pool[(Math.random()*pool.length)|0], n: cupN }); return lines; }
+  // 先挑主料，再挑配料；★ 不把两个"重活"放同一单（例如干冰 ×2 = 22 下连按，那是惩罚不是玩法）
+  for(let i = 0; i < kinds; i++){
+    const rest = kinds - i - 1;
+    let candidates = pool.filter(r => !lines.some(l => l.rec.id === r.id) && left - Math.max(1, left - rest) >= 0);
+    if(i === 0 && kinds >= 2){
+      const light = candidates.filter(r => !HEAVY_RECIPES.has(r.id));
+      if(light.length) candidates = light;
+    }
+    if(rest > 0 && i > 0){
+      const nonHeavy = candidates.filter(r => !HEAVY_RECIPES.has(r.id));
+      if(nonHeavy.length) candidates = nonHeavy;
+    }
+    if(!candidates.length) candidates = pool.filter(r => !lines.some(l => l.rec.id === r.id));
+    const rec = candidates[(Math.random()*candidates.length)|0];
+    const maxN = left - rest;                          // 后面的种类至少各留 1 杯
+    const n = i === kinds - 1 ? left : Math.max(1, 1 + Math.floor(Math.random() * Math.max(1, maxN)));
+    lines.push({ rec, n });
+    left -= n;
+  }
+  return lines;
+}
+function spawnOrder(){
+  const cupN = pick(CFG.cups).n;
+  const lines = drinkPlan(cupN);
+  const rec = lines[0].rec;                            // o.rec 保留 = 主料（配色/兼容旧渲染用）
+  const ice = pick(CFG.ice).v;
+  const sugar = pick(CFG.sugar).v;
+  const P = CFG.patience;
+  // ★ 耐心按"这一单点了几杯"动态给：杯数越多，客人愿意等越久（也乘一点个体差异）
+  const patience = Math.max(P.min, P.base + cupN * P.perCup) * rnd(1 - P.jitter, 1 + P.jitter);
+  const o = {
+    id: ++G.oid, name: NAMES[(Math.random()*NAMES.length)|0], rec, lines, ice, sugar,
+    cups: [], need: cupN, pat: patience, patMax: patience, born: G.elapsed,
+    made: 0, delivered: 0, status: 'wait', grew: false,
+    priority: false, inProgress: false, queueNo: 0, waitAnnounced: false, patBonus: 0
+  };
+  let i = 0;
+  for(const line of lines){
+    for(let k = 0; k < line.n; k++){
+      o.cups.push({ i: i++, rec: line.rec, err: false, done: false, startedAt: null, finishedAt: null, slotReady: false,
+        steps: line.rec.steps.map(s => ({ ...s, ok: false, done: 0 })) });
+    }
+  }
+  o.makeup = lines.map(l => `${l.n}×${l.rec.name}`).join(' + ');
+  G.orders.push(o);
+  refreshSlots();                                      // 先算名额：谁能开工、谁要排队
+  const wip = wipCount();
+  const waitN = G.orders.filter(x => !x.inProgress && x.status !== 'done').length;
+  if(o.inProgress){
+    toast(`${o.name} 要 ${o.makeup} ${ice} ${sugar}`, '');
+    if(G.autoTicket){ const n = makeTicketsFor(o); if(n) toast(`📋 自动出小票 ${n} 张`, ''); }
+  } else {
+    toast(`⏳ ${o.name} 要 ${o.makeup}，到等候区排队（后厨同时只能 ${CFG.kitchen.maxWip} 个任务在制，现在 ${wip} 个在制 / ${waitN} 位在等）`, '');
+  }
+  syncAll();
+}
+
+/* 后厨容量：同时最多 CFG.kitchen.maxWip 个未完成任务（在制的小票）。
+   在制 = 已经开工、且**已经动到占名额的那一步**的杯；没开工的杯不算，开工资格只有 maxWip 个。
+   ★ 「不占名额」的步骤（noSlot）：现萃速溶咖啡的"取粉 / 放粉碗 / 按萃取键"是纯手感步骤，
+     干完就在等机器出咖啡，不占后厨人手；只有最后那步"等 30 秒出咖啡"才占一个在制任务。
+     不加这一条的话，一杯 3 步的咖啡会和一杯 11 下连按的干冰抢同一个名额 ——
+     你反馈的"占用单量逆天、别的啥也干不了"就是这个。这不是新系统，只是让配方的成本和名额对得上。
+   分配规则（★ 这一版改过，混点订单的关键）：
+     **按单填池，一单的多杯一起进**——先到的那一单有多少杯就占多少名额（直到池满），
+     它装不下的、以及后面单子的杯才排队。不能出现"同一单的第一杯开工就把它自己第二杯挤出去"：
+     那样混点订单永远做不完半单（玩家反馈："订单卡上有两杯，可第二杯做不了"）。
+   腾出一个名额（某杯交付了）就自动让给排在队首的那一杯。 */
+function cupWip(c){
+  // 这一杯现在算不算占着名额：开了工 + 已经摸到"占名额"的那一步（中间的纯手感步骤还没占）
+  if(c.done || c.startedAt === null) return false;
+  const idx = c.steps.findIndex(s => !s.ok);
+  for(let k = 0; k < (idx < 0 ? c.steps.length : idx + 1); k++) if(!c.steps[k].noSlot) return true;
+  return false;
+}
+function wipCount(){
+  let n = 0;
+  for(const o of G.orders) for(const c of o.cups) if(cupWip(c)) n++;
+  return n;
+}
+function refreshSlots(){
+  const CAP = CFG.kitchen.maxWip;
+  const used = wipCount();
+  // ★ "已经占掉的名额"要**每帧真的数一遍**，不能用缓存：maxWip 一变（例如运行中调参/重开一局配置不同），
+  //   缓存就会失真、算出不存在的空位 → 池里被塞进超过 CAP 的杯（自检里抓到过：名额=1 却两杯在池）。
+  let claimed = 0;
+  for(const o of G.orders) for(const c of o.cups) if(c.slotReady && !c.done) claimed++;
+  let free = Math.max(0, CAP - used - claimed);
+  // 按进店顺序填池：老单先把自己的杯全塞进去（塞不下才轮到下一单）
+  const byTime = G.orders.slice().sort((a, b) => a.born - b.born || a.id - b.id);
+  let qi = 0;
+  for(const o of G.orders){ o.queueNo = 0; o.priority = false; o.inProgress = o.cups.some(c => cupWip(c)); }
+  for(const o of byTime){
+    if(o.status === 'done') continue;
+    let got = 0;
+    for(const c of o.cups){
+      if(c.done){ c.slotReady = false; continue; }        // 做完的杯不占名额
+      if(c.slotReady){ got++; continue; }                 // 已经在池里的杯保持资格（不能把同单剩下的挤出去）
+      if(free > 0){ c.slotReady = true; free--; got++; }
+      else c.slotReady = false;
+    }
+    if(got > 0) o.priority = true;
+    if(!o.inProgress && o.cups.some(c => !c.done)) o.queueNo = ++qi;
+  }
+  // ★ 兜底：池子的**硬上限**必须成立（CAP 个在制的杯 + 池里等着的杯合计不许超过 CAP）。
+  //   任何上游算错（配置变更、外部改数据）都在这里被裁回来，超出的按"老单优先"踢出。
+  for(const o of byTime){
+    if(used + G.orders.reduce((n, x) => n + x.cups.filter(c => c.slotReady && !c.done).length, 0) <= CAP) break;
+    for(const c of o.cups){
+      if(c.slotReady && !c.done && !cupWip(c)
+        && G.orders.reduce((n, x) => n + x.cups.filter(y => y.slotReady && !y.done).length, 0) > CAP){
+        c.slotReady = false;
+      }
+    }
+  }
+  // 池里的名额变了（某杯交付/某单被撤）就补一次票；每帧的 ensureTickets 会兜底
+  if(G.autoTicket && used !== G._slotsUsed){ makeTicketsFor(); }
+  G._slotsUsed = used;
+  return used;
+}
+
+/* ---------------- 8. 小票（贴纸）：任务载体 + 进度标记 ---------------- */
+function slipNext(cup){ return cup.steps.find(s => !s.ok) || null; }
+// ★★ 铁律：**一杯只能有一张小票**。起票入口都走这里，重复调用直接拿回原来那张。
+//    为什么值得设成铁律：同一杯如果存在两张票，就会出现"我手里这张永远 ready=false"
+//    的现象 —— 工位按钮只认列表里第一张，你点它、它修的是另一张，
+//    表现就是"同一个动作点不完"，跟死循环一模一样（现萃速溶咖啡那次就是这么被报上来的）。
+function slipFor(cup){ return G.slips.find(s => s.cup === cup) || null; }
+function makeSlip(o, cup){
+  const dup = slipFor(cup);
+  if(dup) return dup;
+  const slip = { id: ++G.cid, o, cup, st: null, stalled: 0, ready: false };
+  G.slips.push(slip);
+  return slip;
+}
+// 自动出小票：给"还没起票"的杯补票（进单时、开关打开时、腾出名额时都调）。
+// ★★ 每一杯都出票 —— **包括还没拿到在制名额的杯**。
+//    原来的写法是"拿到名额才起票"，理由是"避免票堆一屏动不了"。但那在**混点订单**上会变成
+//    "第二杯根本没有票"：订单卡上写着两杯，可屏幕上只有一张票，玩家感觉"第二杯做不了"、
+//    而且点了手册也没反应（手动起杯那条路也要求名额）。
+//    现在的口径：**票 = 这一杯的工作单，人手够不够是另一回事**；
+//    没名额的票就"还没挂工位"（队列里显示成"等名额"），名额一腾出来它自己会挂上第一手。
+function makeTicketsFor(order){
+  const max = CFG.autoTicket.maxPerOrder;
+  const list = order ? [order] : G.orders;
+  let n = 0;
+  for(const o of list){
+    if(o.status === 'done') continue;
+    let k = 0;
+    for(const cup of o.cups){
+      if(cup.done) continue;
+      if(k >= max) break;
+      if(slipFor(cup)) continue;
+      const slip = makeSlip(o, cup);
+      const nx = slipNext(cup);
+      // 有开工资格就顺手挂到第一手；没资格就先放着（routeSlip 会拒绝，票留在"等名额"状态）
+      if(nx) routeSlip(slip, nx.st);
+      k++; n++;
+    }
+  }
+  return n;
+}
+// 运行中切开关也要补/退：开了就补票，关了就把"还没开工"的票收回（在做的留着做完）
+function ensureTickets(){
+  if(!G.autoTicket) return 0;
+  let n = 0;
+  for(const o of G.orders){
+    if(o.status === 'done') continue;
+    n += makeTicketsFor(o);
+  }
+  return n;
+}
+function routeSlip(slip, stationId){
+  G.routeCalls = (G.routeCalls || 0) + 1;     // 记账：所有"小票换工位"都从这里走（自检/日报用）
+  const cup0 = slip.cup;
+  // ★ 后厨同时只能有 CFG.kitchen.maxWip 个未完成任务：没拿到名额的杯不许开工。
+  //   例外：**不占名额的纯手感步骤**（速溶咖啡那三步）本来就不占人手，直接放行。
+  const nx0 = slipNext(cup0);
+  if(!cup0.done && cup0.startedAt === null && !cup0.slotReady && !(nx0 && nx0.noSlot)){
+    return { ok:false, why:`后厨已经 ${CFG.kitchen.maxWip} 个任务在制了，这张票先排队（等一个名额腾出来）` };
+  }
+  const nx = slipNext(slip.cup);
+  // ★ ready 的小票没有"下一步"（nx 为 null），它只能去打包台 —— 这条早退必须避开它。
+  //   之前这里一刀切 `if(!nx) return`，结果"做完了的小票自动送打包台"整条路被堵死，
+  //   小票永远停在最后一个工位（浏览器里表现为：全绿的票不往打包台走）。
+  if(!nx && !slip.ready) return { ok:false, why:'这杯已经做完了' };
+  if(!slip.ready && nx.st !== stationId){
+    const s = S[stationId];
+    return { ok:false, why:`${s.name} 做不了「${nx.t}」——那是 ${S[nx.st].name} 的活` };
+  }
+  slip.st = stationId;
+  slip.stalled = 0;
+  const cup = slip.cup;
+  if(cup.startedAt === null){
+    cup.startedAt = G.elapsed;                 // 开工 = 占用一个"未完成任务"名额
+    refreshSlots();                            // 占掉一个名额后重算：谁还能开工、谁被挤去排队
+  }
+  return { ok:true };
+}
+// 小票自动流转：把这杯的"下一步"送到它该去的工位。
+// 三个调用点：小票上点一下 / auto 开关下自动（闲够 CFG.auto.after 秒）/ 做完后自动送打包台。
+function forwardSlip(slip, quiet){
+  if(G.ended) return { ok:false, why:'打烊了' };
+  // ★ 已经做完的杯不该再被流转（做完即出的甜筒连票都收走了）：顺手把这类票清掉，别让它赖在工位上
+  if(slip.cup && slip.cup.done){ G.slips = G.slips.filter(s => s !== slip); return { ok:false, why:'这杯已经交付了' }; }
+  if(slip.st === 'pack' && slip.ready) return { ok:false, why:'已经在打包台了' };
+  const nx = slipNext(slip.cup);
+  if(!slip.ready && !nx) return { ok:false, why:'没有下一步了' };
+  const dst = slip.ready ? 'pack' : nx.st;
+  if(slip.st === dst) return { ok:false, why:'它已经在这个工位了' };
+  const r = routeSlip(slip, dst);
+  if(r.ok){
+    G.autoMoves = (G.autoMoves || 0) + 1;
+    if(!quiet){
+      toast(`小票自动流转 → ${S[dst].icon}${S[dst].name}`, '');
+      const el = document.querySelector(`.st[data-st="${dst}"]`);
+      if(el){ el.classList.add('drop'); setTimeout(() => el.classList.remove('drop'), 420); }
+    }
+  }
+  return r;
+}
+// 做完一杯（不管后面交不交）：记账 + ★ 给客人"续一点耐心"
+//   为什么要有这一步：这一版改成"**全做完一起交**"，客人要等更久；
+//   但如果玩家每做完一杯就能看见客人的耐心**回一口**，"进度"本身就成了补偿 ——
+//   多做一杯不是白等，心情稳住了。续的量和这杯的工序量挂钩：重活（连按十几下）回得多。
+function onCupMade(o, cup, opts){
+  o.made = o.cups.filter(c => c.done).length;
+  if(!opts || !opts.served) if(o.status !== 'done') o.status = o.delivered < o.need ? 'ready' : 'done';
+  const P = CFG.patience;
+  const load = cup.steps.reduce((a, s) => a + (s.kind === 'mash' ? (s.taps || 1) : 1), 0);
+  const bonus = P.doneBonus + Math.min(P.doneBonusMax, load * P.perStep);
+  o.pat = Math.min(o.patMax, o.pat + bonus);
+  o.patBonus = (o.patBonus || 0) + bonus;
+  toast(`☕ ${o.makeup}：这杯做完了（${o.made}/${o.need}）· ${o.name} 耐心 +${Math.round(bonus)}s`, 'ok');
+}
+// 做完即出（serveNow，例如甜筒）：不走打包台，当场交给客人。
+// ★ 为什么单独一个函数而不是复用 deliverCup：deliverCup 是"放上托盘"的语义（不结单），
+//   而这里是"已经递到客人手上"——它必须把 served 记上，否则统计里会少算这一杯。
+function serveCup(o, cup){
+  const slip = G.slips.find(s => s.cup === cup);
+  if(slip) G.slips = G.slips.filter(s => s !== slip);
+  G.served++; G.today.served++;
+  cup.served = true;                                 // 记账标记：finishOrder 不再重复算这一杯
+  popText(`即出 ✓ ${o.makeup}`, $('#pack'), '#ffcf6d');
+  onCupMade(o, cup, { served: true });
+  if(o.cups.every(c => c.done)) finishOrder(o);     // 整单都做完了 → 一次结算
+  syncAll();
+}
+// 收口：把"当前这一步"标记完成（pressStep / 按住攒满 / 测试 都走这里）
+function doStep(slip){
+  const cup0 = slip.cup;
+  // ★ 拦住"杯子已做完但票还标着没做完"的中间态：这种票会永远留在工位上重复点。
+  //   正常路径下不会出现（done 和 ready 是在这里一起置真的），但一旦出现就当场修好。
+  if(cup0.done && !slip.ready){ slip.ready = true; if(globalThis.__ZTRACE__){ globalThis.__ZTRACE__.push(`守卫(#${slip.id}, mask=${cup0.steps.map(x=>x.ok?1:0).join('')})`); } return; }
+  const nx = slipNext(slip.cup);
+  if(!nx) return;
+  // 手法没攒够就不收口（连点要按够次数；按住要按够时间）
+  if((nx.done || 0) < (nx.kind === 'hold' ? HOLD_SEC : (nx.taps || 1))) return;
+  nx.ok = true;
+  const cup = slip.cup;
+  const o = slip.o;
+  if(cup.steps.every(s => s.ok)){
+    cup.done = true; cup.finishedAt = G.elapsed;
+    // ★ 做完即出的品（serveNow，例如甜筒）：不进打包台、不等"全做完一起交"那一步，
+    //   最后一步收口时当场递给客人 —— 这是"不用封杯打包"的现实映射。
+    //   否则照旧：这杯放上托盘 → 等整单全做完由 finishOrder 一次交付。
+    if(cup.rec && cup.rec.serveNow){
+      onCupMade(o, cup);                            // 先记账 + 给客人续耐心（onCupMade 会看 done 数）
+      serveCup(o, cup);
+    } else {
+      slip.ready = true; slip.st = null;
+      onCupMade(o, cup);
+    }
+  } else {
+    const nn = slipNext(cup);
+    // 下一步不在本工位 → 小票回到流转状态（那一步就是打包台的活）
+    if(nn.st !== slip.st) slip.st = null;
+  }
+}
+// 按一下（键盘/点击都走这里，保证两条输入路径的手感一致）
+function pressStep(slip){
+  const nx = slipNext(slip.cup);
+  if(!nx) return { done: false, step: null };
+  const before = nx.done || 0;
+  if(nx.kind === 'tap'){
+    nx.done = nx.taps || 1;
+    doStep(slip);                                   // tap：一下就收口
+  } else if(nx.kind === 'mash'){
+    nx.done = before + 1;                           // 连点：攒次数
+    if(nx.done >= (nx.taps || 1)) doStep(slip);
+  } else {
+    nx.holdOn = true;                               // 按住：交给 tickHolds 攒时间
+  }
+  return { done: nx.ok === true, step: nx, before, after: nx.done || 0 };
+}
+// 按住类每帧推进（松手就停）
+function tickHolds(dt){
+  for(const s of G.slips){
+    const st = slipNext(s.cup);
+    if(st && st.kind === 'hold' && st.holdOn){
+      st.done = Math.min(HOLD_SEC, (st.done || 0) + dt);
+      if(st.done >= HOLD_SEC) doStep(s);
+    }
+  }
+}
+function doWrong(slip, stationId, btn){
+  const nx = slipNext(slip.cup);
+  slip.cup.err = true;
+  G.mistakes++; G.today.mistakes++; G.combo = 0;
+  G.money = Math.max(0, G.money - CFG.money.strikePenalty);
+  G.score = Math.max(0, G.score - CFG.score.mistake);
+  toast(`翻车！${S[stationId].name} 做不了「${nx ? nx.t : '这一步'}」 −¥${CFG.money.strikePenalty}`, 'err');
+  if(btn){ btn.classList.add('shake'); setTimeout(()=>btn.classList.remove('shake'), 380); }
+}
+
+/* ---------------- 9. 出餐 / 结算 ----------------
+   ★ 这一版的核心改动：**全做完一起交**。
+     打包台这一步 = "把这杯做好放到托盘上"（不结单、不计分）；
+     等这一单的**所有杯都做完**，才由 finishOrder() 统一交给客人、一次结算、一次连击。
+     所以：做完一杯只是"进度"，交单才是"结果"。 */
+function deliverCup(slip){
+  const o = slip.o, cup = slip.cup;
+  const allDone = cup.steps.every(s => s.ok);
+  if(!allDone){
+    toast('这杯还没做完，不能交给客人（票已退回）', 'err');
+    slip.ready = false;
+    if(slip.st === 'pack') slip.st = null;
+    return false;
+  }
+  if(cup.done){                              // 已经交过了：清掉这张僵尸票，别再计一次
+    G.slips = G.slips.filter(s => s !== slip);
+    toast('这杯已经交过了，清掉这张票', '');
+    syncAll();
+    return false;
+  }
+  // ★ "做完"这件事在两处收口，两处**同时**置 done 与 ready：
+  //   doStep（最后一步做完）与 deliverCup（交付）。任何一处只置一个，就会造出
+  //   "杯子做完了但票说没做完"的僵尸票 —— 那张票会赖在工位上被反复点，看着像死循环。
+  cup.done = true; slip.ready = true;
+  o.made = o.cups.filter(c => c.done).length;
+  G.slips = G.slips.filter(s => s !== slip);
+  popText(`✓ ${o.makeup} ${o.made}/${o.need}`, $('#pack'), '#5fe08a');
+  flash('rgba(95,224,138,.10)');
+  if(o.made >= o.need) finishOrder(o);        // 全做完 → 一次交给客人
+  syncAll();
+  return true;
+}
+function finishOrder(o){
+  o.delivered = o.need;
+  o.status = 'done';
+  // 整单结算：一次连击、一次评分（不再一杯一杯算）
+  const perfect = !o.cups.some(c => c.err);
+  const slowest = Math.max(...o.cups.map(c => (c.finishedAt || G.elapsed) - (c.startedAt || 0)));
+  const fast = slowest < 25;
+  if(perfect){ G.combo++; G.maxCombo = Math.max(G.maxCombo, G.combo); } else { G.combo = 0; }
+  const tip = Math.min(CFG.money.comboMax, G.combo * CFG.money.comboStep);
+  let earn = 0, sc = 0;
+  for(const cup of o.cups){
+    earn += CFG.money.perCup + Math.round(cup.rec.price * 0.2) + (perfect ? 4 : 0) + (fast ? CFG.money.rushBonus : 0) + tip;
+    sc += CFG.score.perCup + (perfect ? 20 : 0) + (fast ? CFG.score.rushBonus : 0) + G.combo * 2;
+  }
+  if(!perfect){ earn = Math.round(earn * 0.5); sc = Math.round(sc * 0.7); }
+  G.money += earn; G.today.money += earn;
+  G.score += sc;
+  const servedAlready = o.cups.filter(c => c.served).length;   // 做完即出的杯（如甜筒）已经记过账了
+  G.served += (o.need - servedAlready); G.today.served += (o.need - servedAlready);
+  popText(`+¥${earn}`, $('#pack'), perfect ? '#5fe08a' : '#ffc14d');
+  if(G.combo > 0 && G.combo % 5 === 0) toast(`连击 ×${G.combo}（整单）！后厨默契 +¥${tip}`, 'gold');
+  const line = perfect ? (o.pat / o.patMax < .35 ? LINES.slow : LINES.ok) : LINES.err;
+  toast(`${o.name}：${o.need} 杯「${o.makeup}」交付 · ${line[(Math.random()*line.length)|0]}`, perfect ? 'ok' : 'err');
+  G.orders = G.orders.filter(x => x !== o);
+  refreshSlots();                             // 腾出名额 → 队首那张还没开工的票可以开工了
+}
+function orderLeaves(o, wasWaiting){
+  o.status = 'lost';
+  G.left++; G.today.left++; G.combo = 0;
+  if(wasWaiting) G.leftWaiting = (G.leftWaiting || 0) + 1;
+  G.money = Math.max(0, G.money - CFG.money.leavePenalty);
+  G.score = Math.max(0, G.score - CFG.score.leave);
+  G.orders = G.orders.filter(x => x !== o);
+  G.slips = G.slips.filter(s => s.o !== o);
+  toast(`${o.name} ${wasWaiting ? '排队排到没耐心，走了' : '等不下去了，走了'} · 断连击 −¥${CFG.money.leavePenalty}`, 'err');
+  refreshSlots();                         // 他可能本来就占着一个在制名额
+  syncAll();
+}
+
+/* ---------------- 10. 主循环：时间机制 ---------------- */
+let lastT = 0;
+let rafOn = false;
+function frame(now){
+  if(rafOn) requestAnimationFrame(frame);
+  tick(now);
+}
+// 时钟交接：换一个时间源（自动演示的假时钟 / 测试推时间）之前调它，避免 dt 变负
+function resetClock(){ lastT = -1e9; }
+function tick(now){
+  // ★ 时钟交接 / 时间倒流：只要有另一个时钟（rAF ↔ 自动演示的假时钟）插过一脚，
+  //   这里必须**丢弃这一帧**，否则 dt 变负 → 倒计时会反着涨（真机踩过：天剩涨到 1392s）。
+  //   负 dt 还有一种成因：浏览器窗口最小化/休眠后 performance.now 跳变。
+  const dtReal0 = (now - lastT) / 1000;
+  if(!(dtReal0 >= 0) || dtReal0 > 1) { lastT = now; return; }
+  const dtReal = Math.min(0.05, dtReal0);
+  lastT = now;
+  if(!G.running || G.ended) { syncClocks(); return; }
+
+  // 动态流速：积压→慢，空闲→快（均值≈1，所以总时长仍锁在 10/20 分钟）
+  G.backlog = G.slips.filter(s => !s.ready).length;
+  const busy = G.orders.length > 0 || G.backlog > 0;
+  if(busy){ G.idle = 0; } else { G.idle += dtReal; }
+  let target = CFG.flow.base + Math.min(G.backlog, CFG.flow.backlogMax) * CFG.flow.backlogGain;
+  if(G.idle > CFG.flow.idleAfter) target += CFG.flow.idleBonus;
+  if(!busy && G.orders.length === 0) target = Math.min(target, 1.0);
+  G.flow += (target - G.flow) * Math.min(1, dtReal * 1.5);
+  G.flow = Math.max(CFG.flow.min, Math.min(CFG.flow.max, G.flow));
+
+  const dt = dtReal * G.flow;
+  G.elapsed += dtReal; G.realElapsed += dtReal;
+  G.totalLeft = Math.max(0, G.totalLeft - dt);
+  G.dayLeft   = Math.max(0, G.dayLeft   - dt);
+
+  // ── 到店：间隔每次随机（动态），逐日收紧 ──
+  // ★ 收尾减速：当天剩余时间进入最后 closing.rampFrom 比例后，到店间隔被逐渐拉长（最多 ×rampTo），
+  //   到点（dayLeft 归零）**直接停止放人**。这样"打烊"不是一刀切断，而是能感觉到生意在收。
+  const CL = CFG.closing;
+  const dayFrac = G.dayLeft / G.modeCfg.perDay;
+  let slow = 1;
+  if(dayFrac < CL.rampFrom){
+    const r = Math.min(1, (CL.rampFrom - dayFrac) / CL.rampFrom);   // 0 → 1
+    slow = 1 + (CL.rampTo - 1) * r * r;                             // 二次曲线：越到后面掉得越快
+  }
+  if(G.phase === 'closing' || G.dayLeft <= 0){
+    // 关门：不再接待新顾客（手上这些做完就收摊）
+  } else {
+    G.nextArrive -= dt / slow;                                      // slow 越大 → 来得越稀
+    if(G.nextArrive <= 0 && G.orders.length < CFG.kitchen.maxWaiting + 4){
+      spawnOrder();
+      const A = CFG.arrive;
+      const scale = Math.pow(A.dayScale, G.day - 1);                 // 第 1 天 1.0 → 第 5 天 ~0.81
+      const base = rnd(A.min, A.max) * scale * (G.modeCfg.arriveScale || 1);   // ★ 本盘的"人数密度"（5 分钟盘更稀）
+      G.nextArrive = Math.max(1.5, base * rnd(1 - A.jitter, 1 + A.jitter));
+      G.arriveLog.push(+G.nextArrive.toFixed(1));
+      if(G.arriveLog.length > 400) G.arriveLog.shift();
+    }
+    // "最后接单"提示：只在当天第一次触发
+    if(slow > 1.6 && G.lastCallDay !== G.day){
+      G.lastCallDay = G.day;
+      toast(`🔔 第 ${G.day} 天最后接单 —— 之后不再放人进来，手上的做完就收摊`, 'gold');
+    }
+  }
+
+  // 后厨名额：每帧校对一次（谁在制、谁能开工、谁排队），腾出来的名额立刻让给队首
+  refreshSlots();
+
+  // 耐心：★ 只在制的任务对应的人掉得快；排队的也掉，但慢一档；做完了只是没打包的掉得更慢
+  // ★★ 打烊清场期间**耐心完全冻结**：这段时间是留给玩家"把手上的做完"的，
+  //    如果还掉耐心，客人会在你做到一半时走掉、连正在做的杯一起被删掉 ——
+  //    表现就是"打烊后手上的单都干不了了"（他其实是被耐心清零清掉了）。
+  const closingNow = G.phase === 'closing';
+  for(const o of [...G.orders]){
+    if(o.status === 'done') continue;
+    if(closingNow) continue;                       // 冻结：不打烊扣耐心
+    const P = CFG.patience;
+    const drain = !o.inProgress ? P.waitDrain : (o.status === 'ready' ? P.readyDrain : 1);
+    o.pat -= dt * drain;
+    if(o.pat <= 0) orderLeaves(o, !o.inProgress);
+  }
+
+  // 按住类：每帧推进（松手就停）
+  tickHolds(dt);
+
+  // 小票摆放警告（"某一步长时间无人处理，小票会闪烁提醒"）+ 自动流转
+  // ★ 自动流转的**唯一开关**就是 G.auto（T 键）。关掉之后这里一次都不许动小票，
+  //   否则"硬核模式"名存实亡（冒烟测试的反例断言就是盯这个）。
+  for(const s of G.slips){
+    if(s.ready) continue;
+    const nx = slipNext(s.cup);
+    if(!nx) continue;
+    if(s.st === null){ s.stalled += dtReal; } else { s.stalled = 0; }
+    if(G.auto && s.stalled > CFG.auto.after) forwardSlip(s, true);
+  }
+  // 已做完没人打包的，也自动送去打包台（否则耐心条会一直掉）——同样只在自动模式下
+  if(G.auto){
+    for(const s of G.slips) if(s.ready && s.st !== 'pack') forwardSlip(s, true);
+  }
+
+  // ── 打烊流程 ──
+  // 到点：先关门（不再放人 / 已在上面的到店段处理），进入 closing 清场阶段；
+  // 清场期间**倒计时不再走**（dayLeft 已经 0，不会减），玩家把手上剩下的单做完；
+  // 全部交付（或超过 graceSec 硬上限）→ settleDay() 出当日结算页。
+  if(G.phase !== 'closing' && G.dayLeft <= 0){
+    G.phase = 'closing';
+    G.closingLeft = CL.graceSec;
+    toast(`🌙 打烊 —— 不再接待新顾客，把手上的 ${G.orders.length} 单做完就收摊`, 'gold');
+  }
+  if(G.phase === 'closing' && !G._settling){        // 已经进入结算就什么都不做（等玩家按继续/倒计时）
+    const pending = G.orders.filter(o => !o.cups.every(c => c.done));
+    const doneAll = pending.length === 0;
+    G.closingLeft -= dtReal;
+    // ★★ 一天只能结算一次：没有这个闸，面板弹出后循环还在跑，每帧都会再判一次"超时"
+    //    → 反复调用 settleDay() → **房租被反复扣、欠租几秒钟滚成几千**（真机踩到过）。
+    if((doneAll || G.closingLeft <= 0) && !G._settling){
+      G._settling = true;
+      if(!doneAll){
+        // ★ 宽限期到了：不是"全丢"，而是**把已经动过手的单直接算你完成**（别让玩家已经做掉的那些白费），
+        //   只有"压根没开工"的单才算流失。这样硬上限惩罚的是"没动手"，不是"手慢"。
+        for(const o of pending){
+          if(o.inProgress || o.made > 0){
+            for(const c of o.cups){ if(!c.done){ c.done = true; c.steps.forEach(s => { s.ok = true; }); } }
+            finishOrder(o);
+          } else {
+            G.left++; G.today.left++;
+          }
+        }
+        G.orders = []; G.slips = [];
+        toast('打烊时间到 —— 已经在做的单算你交付了，没开工的记流失', 'err');
+      }
+      settleDay();
+      return;
+    }
+  }
+  syncAll();
+}
+
+/* 一天结束：扣房租 → 当天结算页（短）→ 下一天 / 收工总评。
+   为什么把"扣房租 + 结算页"放一起：玩家在这页上看到的"今日净额"就是已经扣过房租的数，
+   不用自己去减，也避免"钱扣了但没看见扣在哪"。 */
+function settleDay(){
+  // ★ 幂等：一天只结一次（外部误调/重复触发都不会重复扣房租）
+  if(G._settledDay === G.day) return;
+  G._settledDay = G.day;
+  const rent = CFG.rent.perDay;
+  G.rentPaid += rent;
+  const paid = G.money >= rent;
+  if(paid){ G.money -= rent; }
+  else { G.rentDebt = (G.rentDebt || 0) + (rent - G.money); G.money = 0; }   // ★ 付不出就欠着（后面要还）
+  G.dayStats.push({ day:G.day, ...G.today, rent, paid, debt:G.rentDebt || 0 });
+  G.log.push(`第 ${G.day} 天：出餐 ${G.today.served} 杯 / 营业额 ¥${G.today.money} / 流失 ${G.today.left} / 翻车 ${G.today.mistakes} → 房租 ¥${rent} ${paid?'已付':`★ 欠缴（累计欠 ¥${G.rentDebt}）`}`);
+  if(G.day >= (G.modeCfg.days || CFG.days)){ endGame(); return; }
+  showDaySettle({ day:G.day, ...G.today, rent, paid });
+}
+function showDaySettle(d){
+  dismissVeil();                                  // 只留一个面板
+  const veil = document.createElement('div');
+  veil.className = 'veil'; veil.id = 'veil';
+  veil.innerHTML = `
+    <div class="panel" style="width:min(460px,92vw)">
+      <h1 style="font-size:19px">🌙 第 ${d.day} 天 打烊</h1>
+      <div class="sum" style="grid-template-columns:repeat(2,1fr); margin:12px 0">
+        <div><b style="color:#5fe08a">${d.served}</b><span>出餐（杯）</span></div>
+        <div><b style="color:#ffcf6b">¥${d.money}</b><span>营业额</span></div>
+        <div><b style="color:#ff9aa4">${d.left}</b><span>流失客人</span></div>
+        <div><b>${d.mistakes}</b><span>翻车</span></div>
+      </div>
+      <div style="font-size:12.5px; color:var(--dim); display:grid; gap:4px">
+        <div style="display:flex;justify-content:space-between"><span>今日房租</span>
+          <b style="color:${d.paid ? 'var(--snow2)' : 'var(--bad)'}">−¥${d.rent}</b></div>
+        <div style="display:flex;justify-content:space-between"><span>结余</span><b style="color:var(--gold)">¥${G.money}</b></div>
+        ${(G.rentDebt || 0) > 0
+          ? `<div style="display:flex;justify-content:space-between"><span>其中没付出去的房租（结算时会扣）</span><b style="color:var(--bad)">¥${G.rentDebt}</b></div>`
+          : ''}
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;margin-top:14px">
+        <button class="btn pri" id="go" style="padding:9px 20px">第 ${d.day + 1} 天 →</button>
+        <span style="font-size:11px;color:var(--dim2)">自动继续 <span id="cd">6</span>s（也可以按空格）</span>
+      </div>
+    </div>`;
+  document.body.appendChild(veil);
+  const go = $('#go');
+  const next = () => { veil.remove(); nextDay(); };
+  go.addEventListener('click', next);
+  let left = 6;
+  const cd = veil.querySelector('#cd');
+  const h = setInterval(() => {
+    left -= 1;
+    if(cd) cd.textContent = left;
+    if(left <= 0 || !document.body.contains(veil)){ clearInterval(h); if(document.body.contains(veil)) next(); }
+  }, 1000);
+  G._dayPanelNext = next;                          // 空格键也能继续（键盘处理里会用到）
+}
+function dismissVeil(){
+  const v = $('#veil');
+  if(v) v.remove();
+  if(G) G._dayPanelNext = null;
+}
+function nextDay(){
+  G._dayPanelNext = null;
+  G._settling = false;                              // 解除"正在结算"（新的一天可以再结算）
+  G.day++; G.dayLeft = G.modeCfg.perDay;
+  G.today = { served:0, money:0, left:0, mistakes:0 };
+  G.phase = 'open';                                  // 没有"理货"那一套：开门就是营业
+  toast(`☀️ 第 ${G.day} 天开门（共 ${G.modeCfg.days || CFG.days} 天）`, 'gold');
+  syncAll();
+}
+
+function endGame(){
+  G.ended = true; G.running = false;
+  dismissVeil();
+  // 没打完的订单算流失
+  for(const o of G.orders){ G.left++; G.today.left++; }
+  G.orders = []; G.slips = [];
+  const debt = G.rentDebt || 0;
+  const net = G.money;
+  const acc = G.served + G.left > 0 ? G.served / (G.served + G.left) : 0;
+  const flowScore = Math.round(acc * 100 * CFG.score.flowWeight);
+  // ★ 欠租 = 真代价：从最终结算里扣掉，并且**每欠 100 元降一档评级**。
+  //   这样"交不出房租"不再是记一行差评就过去了 —— 它会实打实压低你这局的评价。
+  const total = Math.max(0, G.score + flowScore + net - debt);
+  let rank = total >= 34000 ? 'S' : total >= 24000 ? 'A' : total >= 15000 ? 'B' : total >= 8000 ? 'C' : 'D';
+  const steps = Math.min(4, Math.floor(debt / Math.max(1, CFG.rent.debtPerRank)));
+  const ORDER = ['S', 'A', 'B', 'C', 'D'];
+  if(steps > 0) rank = ORDER[Math.min(ORDER.length - 1, ORDER.indexOf(rank) + steps)];
+  showEnd({ rank, total, net, acc, flowScore, debt, downgraded: steps });
+}
+
+/* ---------------- 11. 渲染：订单区 ---------------- */
+function syncAll(){
+  syncClocks(); syncStats(); syncOrders(); syncStations(); syncFxStages();
+}
+
+/* ---------------- 11.5 工位动作演出（2026-09-27）----------------
+   目的：让每一步"看得见是干什么" —— 摇就真的在晃、压缩就真有大锤砸下来。
+   设计要点：
+     · 每张工位卡右上角一个"小舞台"（.fxstage）：杯子 + 该动作的实物（锤 / 火 / 茶汤 / 药水）
+     · 杯子里的**液面高度 = 这一步的进度**（mash 用 done/taps、hold 用 done/sec、tap 直接满）
+       —— 这样"进度"不再只是一个数字，玩家一眼看见杯子在变
+     · 按一下（或开始做）→ 给舞台加 .act-<动作> 类触发一次动画；动画跑完自动摘掉
+     · 没活的工位：舞台压暗到 30%（和"本工位无活"一致）
+   ⚠️ 纯装饰：G.fx === false（无头自检/自动截图）时不生成、不驱动。 */
+const FX_ACTION = { mash:'shake', hold:'compress', tap:'brew' };   // 手法 → 演什么
+// 每个工位自己的动作气质：捣锤区摇/压缩、火系区烤、化学区滴药、萃茶区斟茶
+const FX_BY_STATION = {
+  shake: { mash:'shake',    hold:'compress', tap:'shake' },
+  fire:  { mash:'fire',     hold:'fire',     tap:'fire' },
+  chem:  { mash:'chem',     hold:'chem',     tap:'chem' },
+  brew:  { mash:'brew',     hold:'brew',     tap:'brew' },
+  pack:  { mash:'pack',     hold:'compress', tap:'pack' },
+};
+function buildFxStage(stId){
+  const host = document.querySelector(`.st[data-st="${stId}"] .fx`);
+  if(!host) return null;
+  const el = document.createElement('div');
+  el.className = 'fxstage idle';
+  el.innerHTML = `
+    <div class="flash"></div><div class="ring"></div>
+    <div class="hammer"></div>
+    <div class="flame"></div>
+    <div class="steam"></div><div class="steam s2"></div>
+    <div class="drip"></div>
+    <div class="cupwrap"><div class="cup"><div class="liq"></div></div></div>
+    <div class="label"></div>`;
+  host.appendChild(el);
+  return el;
+}
+function stageOf(stId){
+  const host = document.querySelector(`.st[data-st="${stId}"] .fx`);
+  if(!host) return null;
+  let st = host.querySelector('.fxstage');
+  if(!st && fxOn()) st = buildFxStage(stId);
+  return st;
+}
+// 每帧同步：液面 = 进度；有活/没活的明暗
+function syncFxStages(){
+  if(!fxOn() || !G) return;
+  for(const st of STATIONS){
+    const el = stageOf(st.id);
+    if(!el) continue;
+    const workable = s => {
+      const nx = slipNext(s.cup);
+      if(st.id === 'pack') return s.ready || (!!nx && nx.st === 'pack');
+      return !s.ready && !!nx && nx.st === st.id;
+    };
+    const cur = G.slips.find(workable);
+    const nx = cur ? slipNext(cur.cup) : null;
+    let frac = 0, kindTxt = '待命';
+    if(cur){
+      if(cur.ready){ frac = 1; kindTxt = '可出餐'; }
+      else if(nx){
+        if(nx.kind === 'mash'){ frac = (nx.done || 0) / (nx.taps || 1); kindTxt = `连按 ${nx.done||0}/${nx.taps||1}`; }
+        else if(nx.kind === 'hold'){ frac = (nx.done || 0) / HOLD_SEC; kindTxt = `按住 ${(nx.done||0).toFixed(1)}/${HOLD_SEC}`; }
+        else { frac = nx.ok ? 1 : 0; kindTxt = '一下完成'; }
+      }
+    }
+    const liq = el.querySelector('.liq');
+    if(liq) liq.style.height = Math.max(0, Math.min(1, frac)) * 100 + '%';
+    const lab = el.querySelector('.label');
+    if(lab) lab.textContent = kindTxt;
+    el.classList.toggle('idle', !cur);
+  }
+}
+// 触发一次动作动画（由 doStationAction 调用）
+function fxAction(stId, kind, opts){
+  if(!fxOn()) return;
+  const el = stageOf(stId);
+  if(!el) return;
+  const map = FX_BY_STATION[stId] || FX_ACTION;
+  const act = map[kind] || map.tap;
+  const cls = 'act-' + act;
+  el.classList.remove('act-shake','act-compress','act-fire','act-brew','act-chem','act-pack');
+  void el.offsetWidth;                      // 强制回流 → 同一个动画能连续重放
+  el.classList.add(cls);
+  clearTimeout(el._fxT);
+  el._fxT = setTimeout(() => el.classList.remove(cls), 1500);
+}
+
+function syncClocks(){
+  if(!G) return;
+  const m = G.modeCfg;
+  $('#clk').textContent = G.phase === 'closing' ? fmt(G.closingLeft) : fmt(G.dayLeft);
+  const DAYS = G.modeCfg.days || CFG.days;
+  $('#clksub').textContent = G.phase === 'closing'
+    ? `🌙 打烊清场 · 还剩 ${G.orders.filter(o => o.status !== 'done').length} 单没交 · 清完就结算`
+    : (DAYS > 1 ? `第 ${G.day} 天 / 共 ${DAYS} 天 · 总剩余 ${fmt(G.totalLeft)} · 流速 x${G.flow.toFixed(2)}`
+                : `一口气经营 · 总剩余 ${fmt(G.totalLeft)} · 流速 x${G.flow.toFixed(2)}`);
+  $('#clock').classList.toggle('late', (G.phase === 'closing' ? G.closingLeft < 15 : G.dayLeft < 20) && G.running && !G.ended);
+  const bar = $('#daybar');
+  if(bar.children.length !== DAYS){
+    bar.innerHTML = '';
+    for(let i=1;i<=DAYS;i++){
+      const d = document.createElement('div');
+      d.className = 'daypip'; d.dataset.day = i;
+      d.innerHTML = `<div class="fill"></div><div class="lab">${DAYS > 1 ? '第 ' + i + ' 天' : '营业 5 分钟'}</div>`;
+      bar.appendChild(d);
+    }
+  }
+  [...bar.children].forEach((d,i)=>{
+    const day = i+1;
+    d.classList.toggle('now', day === G.day && !G.ended);
+    d.classList.toggle('done', day < G.day || G.ended);
+    d.querySelector('.fill').style.width = (day < G.day || G.ended) ? '100%'
+      : day === G.day ? (100 - G.dayLeft / m.perDay * 100) + '%' : '0%';
+  });
+  $('#btnPause').innerHTML = G.running ? '暂停 <span style="opacity:.6">Esc</span>' : '继续 <span style="opacity:.6">Esc</span>';
+  const ba = $('#btnAuto');
+  if(ba){
+    ba.innerHTML = `小票自动流转：${G.auto ? '开' : '关'} <span style="opacity:.6">A</span>`;
+    ba.style.borderColor = G.auto ? '#2f6b4f' : '#4a3040';
+    ba.style.background = G.auto ? '#16241d' : '#241a1f';
+    ba.title = G.auto
+      ? `开着：小票闲 ${CFG.auto.after} 秒没人接就自己走到下一步该去的工位；想抢速度仍然可以拖`
+      : '关着：每张小票都要你亲手拖 / 点一下才走（硬核）';
+  }
+  const bt = $('#btnTicket');
+  if(bt){
+    bt.innerHTML = `自动出小票：${G.autoTicket ? '开' : '关'} <span style="opacity:.6">S</span>`;
+    bt.style.borderColor = G.autoTicket ? '#2f6b4f' : '#4a3040';
+    bt.style.background = G.autoTicket ? '#16241d' : '#241a1f';
+    bt.title = G.autoTicket
+      ? `开着：拿到名额的杯自动出小票（后厨同时最多 ${CFG.kitchen.maxWip} 个未完成任务，后面的单在等候区排队）`
+      : '关着：自己点右边手册（或按 1~8）起杯';
+  }
+  $('#live').textContent = `积压小票 ${G.slips.filter(s=>!s.ready).length} · 订单 ${G.orders.length} · 流速 x${G.flow.toFixed(2)}`;
+}
+function syncStats(){
+  if(G.autoTicket) ensureTickets();     // 有位置就给等候区的客人补票（不再需要点手册起杯）
+  $('#sMoney').textContent = '¥' + G.money;
+  const rent = CFG.rent.perDay;
+  $('#sRent').textContent = '¥' + rent + ((G.rentDebt || 0) > 0 ? `（欠 ¥${G.rentDebt}）` : '');
+  $('#sServed').textContent = G.served + ' 杯';
+  $('#sBad').textContent = G.mistakes + ' / ' + G.left;
+  $('#sCombo').textContent = 'x' + G.combo;
+  const sa = $('#sAuto');
+  if(sa){ sa.textContent = G.auto ? `开（已流转 ${G.autoMoves || 0} 次）` : '关（硬核）'; sa.style.color = G.auto ? 'var(--ok)' : 'var(--bad)'; }
+  const wip = wipCount();
+  const waitOrders = G.orders.filter(o => !o.inProgress && o.status !== 'done').length;
+  $('#orderCount').textContent = `在制 ${wip}/${CFG.kitchen.maxWip}` + (waitOrders ? ` · 等候 ${waitOrders}` : '');
+  const sk = $('#sKitchen');
+  if(sk){
+    sk.textContent = `${wip} / ${CFG.kitchen.maxWip} 个任务` + (waitOrders ? `（${waitOrders} 位在等）` : '');
+    sk.style.color = wip >= CFG.kitchen.maxWip ? 'var(--warn)' : 'var(--cream)';
+  }
+  const sarr = $('#sArrive');
+  if(sarr){
+    const L = G.arriveLog || [];
+    const avg = L.length ? (L.reduce((a, b) => a + b, 0) / L.length) : 0;
+    sarr.textContent = `下一位 ${G.nextArrive.toFixed(1)}s · 均值 ${avg.toFixed(1)}s`;
+  }
+  const slw = $('#sLeftWait');
+  if(slw) slw.textContent = (G.leftWaiting || 0) + ' 位';
+}
+function syncOrders(){
+  const box = $('#orders');
+  const seen = new Set();
+  // 在制的（还占着名额的）在上，排队的在下，中间插一条分隔说明
+  const rows = [
+    ...G.orders.filter(o => o.inProgress),
+    ...(G.orders.some(o => !o.inProgress) ? [{ _sep: 1, n: G.orders.filter(o => !o.inProgress).length }] : []),
+    ...G.orders.filter(o => !o.inProgress),
+  ];
+  for(const o of rows){
+    if(o._sep){
+      let el = box.querySelector('[data-sep]');
+      if(!el){
+        el = document.createElement('div');
+        el.dataset.sep = '1';
+        el.style.cssText = 'font-size:11px;color:#8e9bb5;padding:6px 4px 2px;border-top:1px dashed #2b344c;margin-top:2px';
+        box.appendChild(el);
+      }
+      el.textContent = `等候区 · ${o.n} 位 —— 后厨同时只能有 ${CFG.kitchen.maxWip} 个未完成任务（小票），出一个才轮到下一张（排队也吃耐心，掉得慢一档）`;
+      seen.add('sep');
+      continue;
+    }
+    let el = box.querySelector(`[data-oid="${o.id}"]`);
+    if(!el){
+      el = document.createElement('div');
+      el.className = 'ord'; el.dataset.oid = o.id;
+      el.innerHTML = `
+        <div class="who"><b></b><span class="clock2"></span></div>
+        <div class="drink"><span class="emo"></span><span class="nm"></span></div>
+        <div class="mods"></div>
+        <div class="cups"></div>
+        <div class="pat"><i></i></div>
+        <div class="left" style="display:none">走了</div>`;
+      box.appendChild(el);
+    }
+    seen.add(String(o.id));
+    el.classList.toggle('waiting', !o.inProgress);
+    el.querySelector('.who b').textContent = o.inProgress ? o.name : `${o.name} · 等候`;
+    const mine = G.slips.filter(s => s.o === o);
+    const live = mine.filter(s => !s.ready).length;
+    const wip = o.cups.filter(c => c.startedAt !== null && !c.done).length;
+    el.querySelector('.clock2').textContent = o.inProgress
+      ? (`在制 ${wip} 杯 · 已做好 ${o.made}/${o.need}` + (o.rec.serveNow ? '（做完即出，不用打包）' : '（全做完一起交）') + (live > wip ? ` · 另有 ${live - wip} 张票排队` : ''))
+      : `等候中 · 耐心 ${Math.round(Math.max(0, o.pat / o.patMax) * 100)}%`;
+    el.querySelector('.emo').textContent = o.rec.emo;                 // 主料的图标
+    el.querySelector('.nm').textContent = o.makeup || o.rec.name;     // ★ 混点：把整单组成写出来
+    el.querySelector('.mods').innerHTML =
+      `<span class="tag ice">${o.ice}</span><span class="tag sug">${o.sugar}</span>` +
+      `<span class="tag">¥${o.rec.price}起/杯</span>` +
+      (o.lines && o.lines.length > 1 ? `<span class="tag" style="border-color:#4a5c85;color:#cfe0ff">混点 ${o.lines.length} 种</span>` : '') +
+      (o.rec.source === '工坊' ? `<span class="tag" style="border-color:#7a6a2a;color:#ffe0a3">工坊</span>` : '') +
+      (o.patBonus ? `<span class="tag" style="border-color:#2f6b4f;color:#a8f0c4">进度回耐心 +${Math.round(o.patBonus)}s</span>` : '');
+    const cups = el.querySelector('.cups');
+    if(cups.children.length !== o.need){
+      cups.innerHTML = '';
+      for(let i=0;i<o.need;i++){ const c=document.createElement('div'); c.className='cupdot'; cups.appendChild(c); }
+    }
+    [...cups.children].forEach((c,i)=>{
+      const cup = o.cups[i];
+      c.classList.toggle('on', cup.done);
+      c.classList.toggle('err', cup.err && !cup.done);
+      c.title = `第 ${i+1} 杯：${cup.rec ? cup.rec.name : ''}` + (cup.done ? '（做好了，等整单一起交）' : cup.err ? '（翻车过）' : '');
+    });
+    const frac = Math.max(0, o.pat / o.patMax);
+    el.querySelector('.pat i').style.width = (frac*100) + '%';
+    el.classList.toggle('urgent', frac < 0.3);
+  }
+  [...box.children].forEach(el => { if(!seen.has(el.dataset.oid)) el.remove(); });
+}
+
+/* ---------------- 12. 渲染：工位 + 小票 ---------------- */
+function stationSlips(id){ return G.slips.filter(s => s.st === id); }
+function sweepZombieSlips(){
+  // ★ 自愈（只做安全的那一半）：一张票如果"这杯已经做完了、票却还说自己没做完"，
+  //   它就会永远赖在工位上被反复点 —— 这正是"现萃速溶咖啡看着像循环"的那种票。
+  //   ⚠️ 反方向（票 ready 但 cup 没标 done）**不在这里补**：那会把测试想抓的真 bug 一起抹平。
+  for(const s of G.slips) if(s.cup.done && !s.ready){ s.ready = true; s.st = null; }
+}
+function syncStations(){
+  sweepZombieSlips();                  // 先把"做完却说自己没做完"的票收口，再画工位
+  for(const st of STATIONS){
+    const el = document.querySelector(`.st[data-st="${st.id}"]`);
+    const q = el.querySelector('.queue');
+    const btn = el.querySelector('.act');
+    let inQ;
+    // ★ 判据只写一处（workable）：普通工位的队列 = 下一步在本工位；打包台的队列 = 下一步就是打包 或 已完成待出餐。
+    //   两处判据不一致过一次，后果是"打包台永远空着、最后一步没人做、ready 永远 false"的死锁。
+    const workable = s => {
+      const nx = slipNext(s.cup);
+      if(st.id === 'pack') return s.ready || (!!nx && nx.st === 'pack');
+      return !s.ready && !!nx && nx.st === st.id;
+    };
+    // ★ 队列里除了"能动手的"，也包含**"等名额"的票**（这一杯还没拿到在制名额）——
+    //   为什么必须显示它们：混点订单里第二杯的票如果没有名额就"不显示"，
+    //   玩家会以为"第二杯根本没进来/做不了"（这就是"订单卡上有但是它做不了"的真相）。
+    //   它们显示成灰的，标"等名额"，名额一腾出来自己就亮。
+    const startable = s => s.cup.done || s.cup.startedAt !== null || s.cup.slotReady;
+    inQ = G.slips.filter(s => workable(s) || (!s.ready && !s.cup.done && !startable(s) && slipNext(s.cup) && slipNext(s.cup).st === st.id));
+    const key = inQ.map(s => s.id + (startable(s) ? 'a' : 'w')).join(',');
+
+    if(q.dataset.k !== key){
+      q.dataset.k = key;
+      q.innerHTML = '';
+      for(const s of inQ){
+        const nx = slipNext(s.cup);
+        const ok2 = startable(s);
+        const d = document.createElement('div');
+        d.className = 'qc' + (s.ready ? ' ready' : nx ? '' : ' rdy')
+          + (s.stalled > CFG.stallWarn ? ' stalled' : '') + (ok2 ? '' : ' noSlotYet');
+        // 小票自动流转：小票上直接给出"交给哪个工位"，点一下就过去（不用拖）
+        const hint = !ok2 ? '等名额（后厨满了）'
+          : s.ready ? '可出餐 → 空格'
+          : nx ? (s.st === nx.st ? '在本工位' : `→ 点我送 ${S[nx.st].icon}${S[nx.st].name}`)
+          : '—';
+        const nxTxt = s.ready ? '可出餐 → 空格' : (nx ? nx.t : '（没有下一步了）');
+        d.innerHTML = `<span class="d">${s.cup.rec ? s.cup.rec.emo : s.o.rec.emo} ${s.cup.rec ? s.cup.rec.name : s.o.rec.name}</span>
+          <span class="nx">${escapeHtml(nxTxt)}</span>
+          <span class="fwd">${hint}</span>`;
+        d.dataset.slip = s.id;
+        d.title = ok2 ? '拖到工位 = 抢速度；点一下 = 自动流转到该去的工位' : '这一杯还没拿到在制名额：腾出一个名额它自己就会开工';
+        d.addEventListener('pointerdown', ev => startDrag(ev, s));
+        d.addEventListener('click', () => { if(!dragMoved) forwardSlip(s); dragMoved = false; });
+        q.appendChild(d);
+      }
+    }
+    // 本工位的候选小票：队列里第一张**能做的**（绿色）。
+    // ★ 注意：队列里还可能混着"等名额"的票，它们不该让按钮亮起来（点下去只会白挨一次翻车判定）。
+    // ★★ 候选票必须**状态自洽**：要么 ready（且每一步真的做完了，在打包台等出餐），
+    //    要么还没做完、且真的有下一步。票还"没挂工位"时 slipNext 可能是 null（这一杯刚好被做完、
+    //    或状态被上游改坏），这种票必须按"没得做"处理 ——
+    //    以前这里会直接读 null.t，在真机上就是一帧崩、整屏卡死（自检里表现为"主循环抛异常"）。
+    const candOk = s => s.ready ? s.cup.steps.every(x => x.ok) : !!slipNext(s.cup);
+    const inQC = inQ.filter(candOk);
+    const first = inQ[0] || null;
+    const cand = inQC[0] || null;
+    const armed = !!cand && !G.ended && G.running;
+    const good = !!cand;
+    const candNx = cand ? slipNext(cand.cup) : null;
+    btn.classList.toggle('armed', armed && good);
+    btn.classList.toggle('warnact', false);
+    btn.disabled = !armed;
+    el.classList.toggle('hot', armed && good);
+    el.classList.toggle('pressed', !!(armed && candNx && candNx.holdOn && candNx.kind === 'hold'));
+    const t = btn.querySelector('.t');
+    const fill = btn.querySelector('.fill');
+    if(!armed){
+      t.textContent = first ? '有票在等名额（后厨满了）' : '等待小票';
+      if(fill) fill.style.width = '0%';
+    }
+    else if(cand.ready){ t.textContent = `放上托盘：${cand.cup.rec ? cand.cup.rec.name : cand.o.rec.name}`; if(fill) fill.style.width = '0%'; }
+    else {
+      // 手法直接写在按钮上：连按显示还剩几下，按住显示"按住"。
+      // ★ 这里必须再用一次"安全取值"：candNx 是上一帧算的，可能已经被做完了（slipNext → null），
+      //   直接读 .kind 就是真机上的一帧崩。取不到就当"没得做"。
+      const K2 = candNx || slipNext(cand.cup);
+      if(K2){
+        if(K2.kind === 'mash') t.textContent = `${K2.t} · 连按 ${K2.done || 0}/${K2.taps}`;
+        else if(K2.kind === 'hold') t.textContent = `${K2.t} · 按住`;
+        else t.textContent = K2.t;
+        if(fill) fill.style.width = (stepFrac(K2) * 100) + '%';
+      } else {
+        t.textContent = '这杯已经做完了（去打包台）';
+        if(fill) fill.style.width = '0%';
+      }
+    }
+    const x = btn.querySelector('.x');
+    x.textContent = !armed ? '' : (!candNx ? '去打包台' : candNx.kind === 'hold' ? '按住' : candNx.kind === 'mash' ? `还差 ${tapsLeft(candNx)}` : '点这里');
+    btn.dataset.slip = armed ? cand.id : '';
+    btn.dataset.good = good ? '1' : '';
+
+    const badge = el.querySelector('.badge');
+    if(badge){ const rdy = G.slips.filter(s => s.ready).length; badge.style.display = rdy ? '' : 'none'; badge.textContent = `可出餐 ${rdy}`; }
+    // 队列卡是"内容变了才重建"的，所以"闲太久"的高亮得每帧刷新
+    for(const s of inQ){
+      const card = q.querySelector(`[data-slip="${s.id}"]`);
+      if(card) card.classList.toggle('stalled', !s.ready && s.stalled > CFG.stallWarn);
+    }
+  }
+  // 打包区横向小票也用同一套渲染
+  const anyStalled = G.slips.some(s => s.stalled > CFG.stallWarn && !s.ready);
+  $('#hint').style.borderColor = anyStalled ? '#ffc14d66' : '';
+}
+
+/* ---------------- 13. 配方手册 ---------------- */
+function renderBook(){
+  const box = $('#book');
+  box.innerHTML = '';
+  RECIPES.forEach((r, i) => {
+    const el = document.createElement('div');
+    el.className = 'rec'; el.dataset.rid = r.id;
+    const diffCls = 'diff' + Math.min(3, r.diff);
+    const flow = r.steps.map(s => `<span class="chip">${S[s.st].icon}<span class="s">${S[s.st].name.slice(0,2)}</span></span>`).join('<span style="color:#4a5c85">›</span>');
+    const steps = r.steps.map((s,k) => `<i>${k+1}.</i> <u>[${S[s.st].name}]</u> ${escapeHtml(s.t)}`).join('\n');
+    el.innerHTML = `
+      <div class="t"><span>${r.emo}</span>${escapeHtml(r.name)}
+        <span class="pr">¥${r.price}</span></div>
+      <div class="flow">${flow}</div>
+      <div class="steps">${steps}</div>
+      <div class="foot"><span>键 ${i+1}</span><span class="${diffCls}">${'★'.repeat(r.diff)}</span><span>${r.source}</span><span>${r.steps.length} 步</span></div>`;
+    el.addEventListener('click', () => startCup(r));
+    box.appendChild(el);
+  });
+}
+function startCup(rec){
+  if(G.ended || !G.running) return;
+  // ★★ 混点订单里，一单有多个配方 —— 必须按**这一杯自己的配方**找杯，
+  //    不能按订单的 rec（那只是主料）。原来用 o.rec.id 匹配，导致
+  //    "点两个不同产品时，第二种在手册里点了没反应"（手动起杯那条路直接找不到人）。
+  const findCup = o => o.cups.find(c => !c.done && c.rec && c.rec.id === rec.id
+    && (c.slotReady || (() => { const n = slipNext(c); return !!(n && n.noSlot); })()));
+  let o = null, cup = null;
+  for(const ord of G.orders){
+    if(ord.status === 'done') continue;
+    const c = findCup(ord);
+    if(c){ o = ord; cup = c; break; }
+  }
+  if(!o){ toast(`现在没人点「${rec.name}」——接单了再做`, 'err'); return; }
+  if(!cup){
+    const ord = G.orders.find(x => x.status !== 'done' && x.cups.some(c => !c.done && c.rec && c.rec.id === rec.id));
+    if(ord){
+      toast(`「${rec.name}」这一杯还没拿到名额（后厨同时只能 ${CFG.kitchen.maxWip} 个任务在制）`, 'err');
+      return;
+    }
+    toast(`现在没人点「${rec.name}」——接单了再做`, 'err');
+    return;
+  }
+  // ★★ 这一杯**已经有票了**（自动出票开着时是常态）：那就别起第二张、也别报错。
+  //    以前这里会一路走到 routeSlip，撞上"它已经在这个工位了"然后弹一条错误 ——
+  //    表现就是"重复点同一个产品，屏幕上啥也没发生，还挨一句报错"。
+  //    重复点 = 无害的重复意图，直接当"这张票已经在了"处理。
+  const existing = slipFor(cup);
+  if(existing){
+    if(existing.st === null) routeSlip(existing, slipNext(cup).st);   // 没挂工位就顺手挂上
+    syncAll();
+    return;
+  }
+  const slip = makeSlip(o, cup);
+  const nx = slipNext(cup);
+  const r = routeSlip(slip, nx.st);
+  if(r.ok){ toast(`小票已挂到 ${S[nx.st].name}：${nx.t}`, ''); }
+  else { toast(r.why, 'err'); G.slips = G.slips.filter(s => s !== slip); }
+  syncAll();
+}
+
+/* ---------------- 14. 拖拽：小票贴纸 → 工位 ---------------- */
+let drag = null;
+let dragMoved = false;      // 拖动过就不算"点一下"（否则拖完会顺带触发一次自动流转）
+function startDrag(ev, slip){
+  if(G.ended || !G.running) return;
+  ev.preventDefault();
+  drag = { slip, x: ev.clientX, y: ev.clientY, moved: false, target: null };
+  $('#slipT').textContent = slip.ready ? '放上托盘 · ' + (slip.cup.rec ? slip.cup.rec.name : slip.o.rec.name) : slipNext(slip.cup).t;
+  $('#slipS').textContent = `${slip.cup.rec ? slip.cup.rec.name : slip.o.rec.name} · ${slip.o.name}`;
+  $('#slip').style.display = 'block';
+  moveSlip(ev.clientX, ev.clientY);
+  window.addEventListener('pointermove', onDragMove);
+  window.addEventListener('pointerup', onDragUp);
+}
+function moveSlip(x, y){
+  $('#slip').style.left = x + 'px';
+  $('#slip').style.top  = y + 'px';
+  $('#ghostCursor').style.display = 'block';
+  $('#ghostCursor').style.left = x + 'px';
+  $('#ghostCursor').style.top  = y + 'px';
+}
+function onDragMove(ev){
+  if(!drag) return;
+  drag.moved = true;
+  dragMoved = true;
+  moveSlip(ev.clientX, ev.clientY);
+  const el = document.elementFromPoint(ev.clientX, ev.clientY);
+  const st = el && el.closest ? el.closest('.st') : null;
+  const id = st ? st.dataset.st : null;
+  if(id !== drag.target){
+    drag.target = id;
+    $$('.st').forEach(e => e.classList.toggle('drop', e.dataset.st === id));
+  }
+}
+function onDragUp(ev){
+  window.removeEventListener('pointermove', onDragMove);
+  window.removeEventListener('pointerup', onDragUp);
+  const d = drag; drag = null;
+  $('#slip').style.display = 'none';
+  $('#ghostCursor').style.display = 'none';
+  $$('.st').forEach(e => e.classList.remove('drop'));
+  if(!d) return;
+  if(!d.moved){ return; }                      // 没拖动 = 当作点击，交给 click 处理
+  if(!d.target){ toast('小票丢在地上了（要放到工位上）', 'err'); return; }
+  if(d.slip.ready && d.target === 'pack'){
+    deliverCup(d.slip);
+    toast(`✓ 这杯放上托盘 · ${d.slip.cup.rec.name}`, 'ok');
+  } else {
+    const r = routeSlip(d.slip, d.target);
+    if(r.ok){
+      toast(`小票 → ${S[d.target].name}`, 'ok');
+      const st = document.querySelector(`.st[data-st="${d.target}"]`);
+      if(st){ st.classList.add('shake'); setTimeout(()=>st.classList.remove('shake'), 360); }
+    } else {
+      // 拖到错工位本来只提示；但要是玩家接着在这个工位点下去，就是翻车（§15 的按钮逻辑）
+      toast(r.why, 'err');
+    }
+  }
+  syncAll();
+}
+
+/* ---------------- 15. 输入 ---------------- */
+// 手法说明：三种手法共用"点击"这一个动作，差别只在**攒不攒**：
+//   tap  → 按下即完成
+//   mash → 每按一下攒 1，按够 taps 下才完成（有进度条 + 每下抖一下）
+//   hold → 按住不放，进度条自己涨，满 HOLD_SEC 完成；松手就停
+function doStationAction(btn, kind){
+  if(G.ended || !G.running) return;
+  const id = btn.dataset.act;
+  // ★★ 显示的那张小票不一定就是"本工位该做的那张"（队列里可能堆着好几张）。
+  //    这里统一按"本工位现在能对谁动手"来选票，选不出来才按翻车处理。
+  const workable = s => {
+    const nx = slipNext(s.cup);
+    if(id === 'pack') return s.ready || (!!nx && nx.st === 'pack');
+    return !s.ready && !!nx && nx.st === id;
+  };
+  let slip = G.slips.find(s => s.id === Number(btn.dataset.slip) && workable(s)) || G.slips.find(workable);
+  if(!slip) return;
+  const isPack = id === 'pack';
+  const nx = slipNext(slip.cup);
+  if(isPack && slip.ready){ deliverCup(slip); syncAll(); return; }
+  if(!nx){ toast('这杯已经做完了，送打包台按空格', ''); return; }
+  const goodHere = (nx.st === id);
+  if(!goodHere){ doWrong(slip, id, btn); syncAll(); return; }
+
+  if(kind === 'release'){ nx.holdOn = false; return; }      // 松手：按住类停下
+  if(kind === 'press' && nx.kind !== 'hold'){ nx.holdOn = true; }
+  const r = pressStep(slip);
+  // —— 每一下都要有回响，不然连按就是白按 ——
+  btn.classList.add('hit'); setTimeout(() => btn.classList.remove('hit'), 110);
+  fxShake(id, 7);
+  // ★★ 动作演出（2026-09-27）：按一下就演一次对应的"实物动作"
+  //    摇 → 杯子真晃；压缩 → 大锤砸下来、杯子压扁；烤 → 火苗跳；斟茶 → 茶汤滴进杯里
+  fxAction(id, nx.kind === 'hold' ? 'hold' : (nx.kind === 'mash' ? 'mash' : 'tap'));
+  const fx = document.querySelector(`.st[data-st="${id}"]`).querySelector('.fx');
+  if(r.done){
+    popText(randFx(id), fx, S[id].color);
+    flash(S[id].color + '22');
+    toast(`✓ ${nx.t}`, 'ok');
+  } else if(nx.kind === 'mash'){
+    popText(`${nx.done}/${nx.taps}`, fx, S[id].color);
+  } else if(!nx.holdOn && nx.kind !== 'hold'){
+    // 松开键之后不要一直挂着"正在按住"
+  }
+  syncAll();
+}
+$$('.act').forEach(btn => {
+  btn.addEventListener('click', () => doStationAction(btn, 'press'));
+  btn.addEventListener('pointerdown', () => doStationAction(btn, 'press'));   // 按住类的进度从这里开始涨
+  btn.addEventListener('pointerup', () => doStationAction(btn, 'release'));
+  btn.addEventListener('pointerleave', () => doStationAction(btn, 'release'));
+});
+function randFx(id){
+  const v = S[id].verbs;
+  return v[(Math.random()*v.length)|0] + '！';
+}
+// 每按一下让工位抖一下（连按的手感全靠它，没有它连按就是白按）
+function fxShake(id, px){
+  if(!fxOn()) return;
+  const el = document.querySelector(`.st[data-st="${id}"]`);
+  if(!el) return;
+  el.style.transform = `translate(${rnd(-px, px).toFixed(1)}px, ${rnd(-px, px).toFixed(1)}px) scale(0.992)`;
+  clearTimeout(el._shk);
+  el._shk = setTimeout(() => { el.style.transform = ''; }, 70);
+}
+
+/* ---------------- 15. 键盘 ----------------
+   命名逻辑（改键位只改 STATIONS 那张表 + 这一段）：
+     工位    B 捣 / H 火 / C 化 / P 泡   —— 取工位名的动作字，不取屏幕位置
+     出餐    空格
+     开关    A = 自动流转（Auto） / S = 自动出小票（票 Shōu…就用 S）
+     系统    Esc = 暂停 / R = 重开（**只在打烊结算后**，游戏进行中 R 不抢工位的键）
+     手册    1~8 = 手动起杯（只在关掉"自动出小票"后才有用）
+   ⚠️ 别再用数字键起杯 + 字母键做工位这套混合命名：B 既是工位又是产品时，
+      两个语义撞在一起，用久了会误按。 */
+window.addEventListener('keydown', e => {
+  const k = (e.key || '').toLowerCase();
+  if(e.key === 'F2'){                                  // 调试开关（连根删这一段即可）
+    DEBUG_KEYS = !DEBUG_KEYS;
+    DEBUG('调试', `调试键：${DEBUG_KEYS ? '开（9 加钱 / 0 快进收盘清客）' : '关'}`);
+    e.preventDefault(); return;
+  }
+  if(e.key === 'Escape'){ togglePause(); return; }
+  if(G.ended){                                   // 结算后：R 重开
+    if(k === 'r'){ restart(); }
+    return;
+  }
+  if(k === 'a' && !e.repeat){ toggleAuto(); e.preventDefault(); return; }
+  if(k === 's' && !e.repeat){ toggleTicket(); e.preventDefault(); return; }
+  if(!G.running) return;
+  // ───────── 调试键（临时，正式发布前删掉这一段 + 上面的 DEBUG 开关）─────────
+  //   9 = 营业额 +¥500（直接进钱，用来验房租/结算/评级）
+  //   0 = 快进到当天最后 10 秒，并且**清掉所有顾客**（用来验打烊流程与当日结算页）
+  //   正文字母键与 1~8 都被正式功能占满了，所以用闲着的 9 / 0。
+  if(DEBUG_KEYS){
+    if(k === '9' && !e.repeat){
+      G.money += 500; G.today.money += 500;
+      DEBUG('调试', `营业额 +¥500 → ¥${G.money}`);
+      e.preventDefault(); return;
+    }
+    if(k === '0' && !e.repeat){
+      G.dayLeft = Math.min(G.dayLeft, 10);
+      G.nextArrive = 1e9;                       // 别让这 10 秒里又来人
+      const cleared = G.orders.length;
+      for(const o of G.orders){ o.status = 'done'; }
+      G.orders = []; G.slips = [];
+      refreshSlots();
+      DEBUG('调试', `快进到当天最后 10 秒，清掉 ${cleared} 位顾客（马上打烊）`);
+      e.preventDefault(); return;
+    }
+  }
+  // ───────── 调试键结束 ─────────
+  if(STATION_KEYS[k]){
+    const btn = document.querySelector(`.act[data-act="${STATION_KEYS[k]}"]`);
+    if(!btn) return;
+    // 敲键和按鼠标走**同一条**手感逻辑：连按类每次 keydown 攒一下；
+    // 按住类用 keyup 收手（注意别把按住类做成一路点到底，那样四只手就只剩一只手了）。
+    if(e.repeat) return;
+    doStationAction(btn, 'press');
+    e.preventDefault();
+    return;
+  }
+  if(e.code === 'Space' || e.key === ' '){
+    // 当日结算页：空格 = 继续下一天（比用鼠标快，也不用等那 6 秒）
+    if(G._dayPanelNext){ e.preventDefault(); G._dayPanelNext(); return; }
+    const btn = document.querySelector('.act[data-act="pack"]');
+    if(btn){ if(e.repeat) return; doStationAction(btn, 'press'); }
+    e.preventDefault();
+    return;
+  }
+  if(/^[1-8]$/.test(e.key)){ const r = RECIPES[Number(e.key) - 1]; if(r) startCup(r); }
+});
+window.addEventListener('keyup', e => {
+  const k = (e.key || '').toLowerCase();
+  const btn = STATION_KEYS[k] ? document.querySelector(`.act[data-act="${STATION_KEYS[k]}"]`) : null;
+  if(btn) doStationAction(btn, 'release');
+});
+
+/* ---------------- 16. 开局面板 / 结算 ---------------- */
+let chosen = 'fast';
+function showStart(){
+  const veil = document.createElement('div');
+  veil.className = 'veil'; veil.id = 'veil';
+  veil.innerHTML = `
+    <div class="panel">
+      <h1>雪皇的后厨 · <em>荒诞饮品模拟器</em></h1>
+      <p>名字离谱，操作真实。把左边的小票拖到工位，一步一步做出来，送到打包台。</p>
+      <div class="modes">
+        ${Object.entries(CFG.modes).map(([k,m]) => `
+          <div class="mode ${k===chosen?'sel':''}" data-mode="${k}">
+            <div class="big">${m.total/60} 分钟</div>
+            <b>${m.label}</b>
+            <div class="m">${m.desc}${m.days > 1 ? `（每天 ${m.perDay/60} 分钟，打烊后手上的做完就结算）` : ''}</div>
+          </div>`).join('')}
+      </div>
+      <div class="rules">
+        <b style="color:#cfd8ee">怎么玩</b><br>
+    · <b>接单</b>：左边自动进客；后厨<b>同时只能有 3 个未完成任务（3 张在制小票）</b>，多的杯在等候区排队（排队也吃耐心，掉得慢一档），出一个名额补一张票<br>
+        · <b>流转</b>：小票会<b>自动走到下一手</b>（<kbd>A</kbd> 可关掉变硬核）；想抢速度就<b>拖</b>小票，或点一下小票立刻送过去<br>
+        · <b>做工位</b>：<kbd>B</kbd> 捣锤 · <kbd>H</kbd> 火系 · <kbd>C</kbd> 化学 · <kbd>P</kbd> 萃茶 —— 取工位名的动作字，键位跟着活儿走<br>
+        · <b>出餐</b>：小票全绿后自动进打包台，按 <kbd>空格</kbd> 出餐，越快评分越高<br>
+        · <b>开关</b>：<kbd>A</kbd> 自动流转 · <kbd>S</kbd> 自动出小票 · <kbd>Esc</kbd> 暂停 · <kbd>R</kbd> 重开（结算后）· <kbd>1</kbd>~<kbd>8</kbd> 手动起杯（关掉自动出票后才有用）<br>
+        · <b>纪律</b>：做错工位 = 翻车扣钱；客人耐心条空了就走人<br>
+        · <b>时间</b>：整套经营锁死在 ${CFG.modes[chosen].total/60} 分钟里，忙的时候时间会稍慢、闲下来会稍快
+      </div>
+      <div style="display:flex; gap:10px; margin-top:16px; align-items:center">
+        <button class="btn pri" id="go" style="padding:10px 22px; font-size:14px">开门营业 →</button>
+        <span class="tagline">「如果你在生活中善于观察，一定能体会到这种感觉。」</span>
+      </div>
+    </div>`;
+  document.body.appendChild(veil);
+  veil.querySelectorAll('.mode').forEach(m => m.addEventListener('click', () => {
+    chosen = m.dataset.mode;
+    veil.querySelectorAll('.mode').forEach(x => x.classList.toggle('sel', x === m));
+    const rc = veil.querySelector('.rules');
+    const M = CFG.modes[chosen];
+    rc.innerHTML = rc.innerHTML
+      .replace(/锁死在 \d+ 分钟/, `锁死在 ${M.total/60} 分钟`);
+  }));
+  $('#go').addEventListener('click', () => { veil.remove(); start(chosen); });
+  $('#btnRestart').onclick = restart;
+  $('#btnPause').onclick = togglePause;
+  $('#btnAuto').onclick = toggleAuto;
+  $('#btnTicket').onclick = toggleTicket;
+}
+function showEnd(r){
+  const veil = document.createElement('div');
+  veil.className = 'veil'; veil.id = 'veil';
+  const rows = G.dayStats.map((d, i) => {
+    const prev = i > 0 ? (G.dayStats[i - 1].debt || 0) : 0;
+    const short = Math.max(0, (d.debt || 0) - prev);        // 这一天的房租里没付出去的部分
+    return `<div style="display:flex; justify-content:space-between; font-size:12px; color:var(--dim); padding:3px 0; border-bottom:1px dashed #232c40">
+       <span>第 ${d.day} 天</span><span>出餐 ${d.served} 杯 · ¥${d.money} · 流失 ${d.left} · 翻车 ${d.mistakes}</span>
+       <span style="color:${d.paid?'#5fe08a':'#ff6b6b'}">房租 ¥${d.rent} ${d.paid ? '已付' : `欠 ¥${short}`}</span>
+     </div>`;
+  }).join('');
+  veil.innerHTML = `
+    <div class="panel">
+      <div class="rankbox"><div class="rk">${r.rank}</div>
+        <div style="font-size:12.5px;color:var(--dim)">综合评分 ${r.total}（营业额分 ${G.score} + 准点率 ${r.flowScore} + 结余 ${r.net}${r.debt ? ` − 没付出去的房租 ${r.debt}` : ''}）</div>
+        ${r.downgraded ? `<div style="font-size:12px;color:var(--bad);margin-top:4px">★ 有 ¥${r.debt} 房租没付出去 → 评级降 ${r.downgraded} 档</div>` : ''}</div>
+      <div class="sum">
+        <div><b style="color:#5fe08a">${G.served}</b><span>累计出餐（杯）</span></div>
+        <div><b style="color:#ffcf6b">¥${G.money}</b><span>结余（付掉房租 ¥${G.rentPaid - (r.debt||0)}，欠 ¥${r.debt||0}）</span></div>
+        <div><b style="color:${r.debt ? 'var(--bad)' : '#5fe08a'}">−¥${r.debt || 0}</b><span>没付出去的房租（已从评分扣）</span></div>
+        <div><b style="color:#ff9aa4">${Math.round(r.acc*100)}%</b><span>准点率</span></div>
+        <div><b>${G.mistakes}</b><span>翻车次数</span></div>
+        <div><b>${G.left}</b><span>流失客人</span></div>
+      </div>
+      <div style="margin:12px 0 6px; font-size:12px; color:#cfd8ee; font-weight:700">营业日报</div>
+      ${rows || '<div style="font-size:12px;color:var(--dim2)">（还没打完一天）</div>'}
+      <div class="rules" style="white-space:pre-wrap">${G.log.join('\n')}</div>
+      <div style="display:flex; gap:10px; margin-top:16px">
+        <button class="btn pri" id="again" style="padding:10px 22px; font-size:14px">再来一局 →</button>
+        <span class="tagline">你记住的不是「我赢了」，而是「那次我把干冰当糖加进去了」。</span>
+      </div>
+    </div>`;
+  document.body.appendChild(veil);
+  $('#again').addEventListener('click', restart);
+}
+
+/* ---------------- 17. 小工具：吐司 / 飘字 / 闪屏 ----------------
+   ★ 无头自检时这些纯装饰要**整个跳过**（`G.fx === false`）：
+     一局里有 800 多次动作，每次都建 DOM + 两个定时器，Node 里能把一个该 5 秒跑完的
+     自检拖成几分钟（我被这件事坑过好几次）。装饰关掉不影响任何游戏逻辑。 */
+function fxOn(){ return !G || G.fx !== false; }
+function toast(msg, kind){
+  if(!fxOn()) return;
+  const t = document.createElement('div');
+  t.className = 'toast ' + (kind || '');
+  t.textContent = msg;
+  $('#toasts').appendChild(t);
+  setTimeout(() => { t.style.transition = '.3s'; t.style.opacity = '0'; t.style.transform = 'translateY(-6px)'; }, 1800);
+  setTimeout(() => t.remove(), 2200);
+  const box = $('#toasts');
+  while(box.children.length > 3) box.firstChild.remove();
+}
+function popText(txt, host, color){
+  if(!fxOn() || !host) return;
+  const r = host.getBoundingClientRect();
+  const el = document.createElement('div');
+  el.className = 'pop'; el.textContent = txt; el.style.color = color || '#fff';
+  el.style.left = (r.left + r.width/2 + rnd(-40,40)) + 'px';
+  el.style.top  = (r.top + r.height/2) + 'px';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 750);
+}
+function flash(color){
+  if(!fxOn()) return;
+  const f = $('#flash');
+  f.style.background = color;
+  f.style.opacity = '1';
+  setTimeout(() => { f.style.opacity = '0'; }, 60);
+}
+function escapeHtml(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* ---------------- 18. 启动 / 暂停 / 重开 ---------------- */
+function start(mode){
+  newGame(mode);
+  G.running = true; G.phase = 'open';
+  toast(`开门！${CFG.modes[mode].label} · 5 天`, 'gold');
+  toast('先看右边手册，按 1~8 起第一杯', '');
+}
+function togglePause(){
+  if(!G || G.ended) return;
+  G.running = !G.running;
+  toast(G.running ? '继续营业' : '暂停（后厨全体发呆中）', G.running ? 'ok' : '');
+  syncAll();
+}
+// 小票自动流转开关（T）：开着 = 小票闲够几秒自己走；关掉 = 每张都要亲手拖/点
+function toggleAuto(){
+  if(!G) return;
+  G.auto = !G.auto;
+  toast(G.auto
+    ? `小票自动流转：开（闲 ${CFG.auto.after} 秒自动交给下一手，拖拽仍可用）`
+    : '小票自动流转：关（硬核模式，全部靠你拖/点）', G.auto ? 'ok' : '');
+  syncAll();
+}
+// 自动出小票开关（S）：开着 = 客人一进单就自动起票；关掉 = 手动点手册起杯
+function toggleTicket(){
+  if(!G) return;
+  G.autoTicket = !G.autoTicket;
+  if(G.autoTicket){
+    const n = ensureTickets();
+    toast(`自动出小票：开${n ? `（补了 ${n} 张小票）` : ''}`, 'ok');
+  } else {
+    // 收掉"还没开工"的票，手上正在做的不动
+    const before = G.slips.length;
+    G.slips = G.slips.filter(s => s.st !== null || s.ready);
+    toast(`自动出小票：关（收回 ${before - G.slips.length} 张待接小票，改手动起杯）`, '');
+  }
+  syncAll();
+}
+function restart(){ const v = $('#veil'); if(v) v.remove(); showStart(); }
+
+/* ---------------- 19. 自动演示（?auto=1）：给截图/录屏/自检用的机器人，不是给玩家用的 ----------------
+   用法：雪皇的后厨.html?auto=1&mode=fast&speed=8
+   speed>1 时用假时钟把时间压快（截图工具等不起 10 分钟），但走的是**和真人完全一样的输入路径**：
+   点手册起杯、把"没挂工位/工位不对"的小票重挂到该去的工位、点工位的绿色按钮、点打包台出餐。 */
+function autoPlay(){
+  const q = new URLSearchParams(location.search);
+  const speed = Number(q.get('speed') || 1) || 1;
+  // ★ 为什么不用 requestAnimationFrame：无头截图/录屏时页面是"隐藏"的，
+  //   浏览器会把 rAF 压到几乎不触发（实测：--virtual-time-budget 下整局时间停在 0）。
+  //   所以自动演示自己用 setInterval 推一个假时钟（虚拟时间下照样跑），
+  //   同时把 rAF 主循环停掉，免得两个时钟打架。
+  rafOn = false;
+  resetClock();                     // 时钟交接：假时钟从 0 开始，不能和 rAF 的时间戳混用
+  let autoClock = 0;
+  // 工位键直接取 STATIONS 的自述键（B/H/C/P），别在这里另写一套（写两套就会漂）
+  const keys = Object.fromEntries(STATIONS.filter(s => s.id !== 'pack').map(s => [s.id, s.key.toLowerCase()]));
+  const press = k => window.dispatchEvent(new KeyboardEvent('keydown', { key: k }));
+  let ticks = 0, acts = 0;
+  document.querySelectorAll('.veil').forEach(v => v.remove());
+  G.fx = false;                      // 自动演示/截图：关掉纯装饰（省掉每一下的 DOM 与定时器）
+  setInterval(() => { autoClock += 33 * speed; ticks++; tick(autoClock); }, 0);
+  const dbg = document.createElement('div');            // auto 模式的探针：验证截图工具能读到自检结果
+  dbg.id = 'autodbg';
+  dbg.style.cssText = 'position:fixed;right:8px;bottom:8px;z-index:99;font:11px/1.4 monospace;color:#9fb;background:#000a;padding:4px 8px;border-radius:8px';
+  document.body.appendChild(dbg);
+  window.addEventListener('error', e => { dbg.textContent = 'JS ERROR: ' + e.message; dbg.style.color = '#f88'; });
+  setInterval(() => {
+    const g = G;
+    const full = g.slips.filter(s => s.cup.steps.every(y => y.ok)).length;
+    dbg.textContent = `AUTO t=${ticks} a=${acts} 天数=${g.day} 天剩=${g.dayLeft.toFixed(0)}/${g.modeCfg.perDay} 总剩=${g.totalLeft.toFixed(0)}/${g.modeCfg.total} 出餐=${g.served} 翻车=${g.mistakes} 流失=${g.left} 订单=${g.orders.length} 在制=${g.slips.filter(s => !s.ready).length} 待出餐=${g.slips.filter(s => s.ready).length} 全步完成=${full} ¥${g.money}`;
+    window.__AUTODBG__ = dbg.textContent;
+  }, 400);
+  start(q.get('mode') === 'slow' ? 'slow' : 'fast');
+  setInterval(() => {
+    if(!G.running || G.ended) return;
+    acts++;
+    const slip = G.slips.find(s => !s.ready && slipNext(s.cup)) || null;
+    if(slip){
+      const nx = slipNext(slip.cup);
+      if(!G.slips.some(s => !s.ready)) return;
+      if(slip.st !== nx.st){
+        const key = keys[nx.st];
+        if(key){ window.dispatchEvent(new KeyboardEvent('keydown', { key })); return; }   // 等价于按 Q/W/E/R
+        if(nx.st === 'pack'){ window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' })); return; }
+      }
+      const key = keys[nx.st];
+      if(key) window.dispatchEvent(new KeyboardEvent('keydown', { key }));
+      else window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+      return;
+    }
+    if(G.slips.some(s => s.ready)){ window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' })); return; }
+    // 没小票了：照着手册给当前订单起一杯（等价于按 1~8）
+    const r = RECIPES.findIndex((rec, i) => G.orders.some(o => o.rec.id === rec.id && o.cups.some(c => !c.done)));
+    if(r >= 0) window.dispatchEvent(new KeyboardEvent('keydown', { key: String(r + 1) }));
+  }, 120);
+  window.__SNOWKING__ = { G: () => G, start, tick, syncAll, slipNext, routeSlip, forwardSlip, doStep, deliverCup, finishOrder, toggleAuto, toggleTicket, RECIPES, STATIONS, S, CFG };
+}
+
+/* ---------------- 20. 开工 ---------------- */
+newGame('fast');
+// 开发/演示用的一点点 URL 调参（不影响正常玩法）：
+//   ?wip=1        后厨只允许 1 个未完成任务在制（最容易看出排队）
+//   ?arrive=3     到店间隔上限（秒），调小=客人更密
+try{
+  const q = new URLSearchParams(location.search);
+  if(q.get('wip')) CFG.kitchen.maxWip = Math.max(1, Math.min(9, Number(q.get('wip')) || 3));
+  if(q.get('arrive')) CFG.arrive.max = Math.max(1, Number(q.get('arrive')) || 12.5);
+}catch(e){}
+showStart();
+
+/* 测试挂钩：只在没有浏览器动画帧的环境（无头冒烟测试）里挂出来，正常浏览器里是 undefined */
+if(typeof requestAnimationFrame !== 'function'){
+  globalThis.__SNOWKING__ = {
+    G: () => G, start, togglePause, restart, renderBook, spawnOrder, startCup,
+    makeSlip, routeSlip, forwardSlip, doStep, doWrong, deliverCup, finishOrder, onCupMade, tick, syncAll, toggleAuto, togglePause,
+    toggleTicket, makeTicketsFor, ensureTickets, resetClock, refreshSlots, wipCount,
+    pressStep, tickHolds, tapsLeft, stepFrac,
+    CFG, RECIPES, STATIONS, S, slipNext
+  };
+}
+
+if(typeof location === 'object' && /[?&]auto=1/.test(location.search || '')) autoPlay();
+/* 只有真的有动画帧才开主循环（无头冒烟测试里由测试自己推 tick） */
+if(typeof requestAnimationFrame === 'function'){ rafOn = true; requestAnimationFrame(t => { lastT = t; requestAnimationFrame(frame); }); }
+</script>
+</body>
+</html>

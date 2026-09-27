@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>火：三角样（抛物线包络）</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#07090f;color:#EEF3FC;font-family:"Microsoft YaHei","PingFang SC",sans-serif;padding:26px 30px}
+  .row{display:flex;gap:32px;align-items:flex-end;flex-wrap:nowrap}
+  .it{display:flex;flex-direction:column;align-items:center;gap:8px}
+  .big{display:flex;gap:14px;align-items:flex-end}
+  canvas{image-rendering:pixelated;background:#0a0e18;border:1px solid #2a3550;border-radius:6px}
+  .cap{font-size:13.5px;font-weight:600;color:#FFD682;text-align:center}
+  .sub{font-size:11.5px;color:#93a3c4;text-align:center;line-height:1.7}
+</style>
+</head>
+<body>
+<div class="row">
+  <div class="it">
+    <div class="cap">① 24×30 · 抛物线包络（尖）</div>
+    <div class="big">
+      <canvas id="A" width="240" height="240" style="width:240px"></canvas>
+      <canvas id="Ar" width="90" height="90" style="width:90px"></canvas>
+    </div>
+    <div class="sub">底宽 100% → 顶收成 1 格 · 720 方块</div>
+  </div>
+  <div class="it">
+    <div class="cap">② 18×30 · 抛物线包络</div>
+    <div class="big">
+      <canvas id="B" width="240" height="240" style="width:240px"></canvas>
+      <canvas id="Br" width="90" height="90" style="width:90px"></canvas>
+    </div>
+    <div class="sub">同一形状但格子更宽 → 阶梯感重 · 540 方块</div>
+  </div>
+  <div class="it">
+    <div class="cap">③ 24×30 · 包络 + 抖动（更活）</div>
+    <div class="big">
+      <canvas id="C" width="240" height="240" style="width:240px"></canvas>
+      <canvas id="Cr" width="90" height="90" style="width:90px"></canvas>
+    </div>
+    <div class="sub">包络本身带随机 → 尖头会飘、偶尔甩出一条火舌</div>
+  </div>
+  <div class="it">
+    <div class="cap">④ 24×30 · 上尖下宽（更瘦）</div>
+    <div class="big">
+      <canvas id="D" width="240" height="240" style="width:240px"></canvas>
+      <canvas id="Dr" width="90" height="90" style="width:90px"></canvas>
+    </div>
+    <div class="sub">指数 1.6 → 腰更细、头更尖，像烛火</div>
+  </div>
+</div>
+
+<script>
+const PAL=[[7,7,15,0],[26,10,10,40],[60,12,10,90],[100,15,12,140],[140,20,12,180],[176,28,12,210],
+[206,40,12,235],[226,58,12,250],[238,78,14,255],[246,100,16,255],[250,120,18,255],[252,140,22,255],
+[254,158,26,255],[255,172,34,255],[255,186,48,255],[255,198,66,255],[255,208,86,255],[255,216,108,255],
+[255,224,132,255],[255,232,158,255],[255,238,182,255],[255,244,206,255],[255,249,226,255],[255,252,242,255],[255,255,255,255]];
+const N=PAL.length;
+
+// p: 包络指数（1=线性三角，越大越瘦越尖）  jitter: 包络随机幅度
+function mk(big, real, cols, rows, p, jitter){
+  const bctx=big.getContext('2d'), rctx=real.getContext('2d');
+  const off=document.createElement('canvas'); off.width=cols; off.height=rows;
+  const octx=off.getContext('2d'); const img=octx.createImageData(cols,rows);
+  const heat=new Uint8Array(cols*rows);
+  const cx=(cols-1)/2;
+  const halfPx = Math.floor(cols/2);                    // 底部的最大半宽（像素格）
+  function halfAt(r){
+    const t = rows<=1 ? 0 : (rows-1-r)/(rows-1);        // r=rows-1(底)→0 ; r=0(顶)→1
+    let h = halfPx * Math.pow(1 - t, p);   // t: 0=底 1=顶 → 底最宽、顶收尖
+    if (jitter > 0) h = h * (1 - jitter + Math.random()*jitter*2);
+    return Math.max(0.5, h);                            // 顶部保底 ~半格 → 收成尖
+  }
+  function allowed(c, r){ return Math.abs(c-cx) <= halfAt(r); }
+  function seed(){
+    for(let r=rows-3;r<rows;r++)
+      for(let c=0;c<cols;c++)
+        if(allowed(c,r)) heat[r*cols+c]=N-2+(rows-1-r>1?0:1);
+  }
+  seed();
+  function step(){
+    seed();
+    for(let y=rows-1;y>0;y--) for(let x=0;x<cols;x++){
+      const s=heat[y*cols+x];
+      if(s===0){ heat[(y-1)*cols+x]=0; continue; }
+      const d=(Math.random()*3)|0, nx=x+((Math.random()*3)|0)-1;
+      const tx=nx<0?0:(nx>=cols?cols-1:nx);
+      if(!allowed(tx, y-1)){ if(heat[(y-1)*cols+tx] < s-3) heat[(y-1)*cols+tx]=Math.max(0,s-4); continue; }
+      heat[(y-1)*cols+tx]=Math.max(0,s-d);
+    }
+  }
+  function draw(){
+    for(let i=0;i<cols*rows;i++){ const c=PAL[heat[i]]||PAL[0]; const o=i*4;
+      img.data[o]=c[0];img.data[o+1]=c[1];img.data[o+2]=c[2];img.data[o+3]=c[3]; }
+    octx.putImageData(img,0,0);
+    for(const [cv,ctx] of [[real,rctx],[big,bctx]]){
+      ctx.clearRect(0,0,cv.width,cv.height); ctx.imageSmoothingEnabled=false;
+      ctx.drawImage(off,0,0,cols,rows,0,0,cv.width,cv.height);
+    }
+  }
+  for(let i=0;i<170;i++) step(); draw();
+  return {step,draw};
+}
+const a=mk(document.getElementById('A'),document.getElementById('Ar'),24,30,0.85,0);
+const b=mk(document.getElementById('B'),document.getElementById('Br'),18,30,0.85,0);
+const c=mk(document.getElementById('C'),document.getElementById('Cr'),24,30,0.85,0.18);
+const d=mk(document.getElementById('D'),document.getElementById('Dr'),24,30,1.25,0);
+if(location.hash!=='#still'){
+  let last=0;
+  requestAnimationFrame(function loop(t){
+    if(t-last>33){last=t;a.step();a.draw();b.step();b.draw();c.step();c.draw();d.step();d.draw();}
+    requestAnimationFrame(loop);
+  });
+}
+</script>
+</body>
+</html>
