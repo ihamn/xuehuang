@@ -11,7 +11,7 @@ const ROOT = path.resolve(import.meta.dirname, '..');
 const argOf = (n, d) => { const h = process.argv.find(a => a.startsWith('--' + n + '=')); return h ? h.slice(n.length + 3) : d; };
 const BUNDLE = path.resolve(ROOT, process.argv.slice(2).find(a => !a.startsWith('--')) || 'dist/xuehuang.lua');
 const FRAMES = Number(argOf('frames', 200));
-const SIM = 'D:/miliastra-beyond-simulator';
+import { SIM_ROOT as SIM } from './sim-root.mjs';   // 模拟器位置：一处解析（云电脑/本机通用）
 
 const { createRuntime } = await import(pathToFileURL(path.join(SIM, 'client/lua-runtime/src/index.js')).href);
 const rt = createRuntime({ canvasWidth: 1280, canvasHeight: 720 });

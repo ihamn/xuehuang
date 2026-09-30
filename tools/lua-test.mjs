@@ -13,7 +13,7 @@ import { pathToFileURL } from 'node:url';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const SRC = path.join(ROOT, 'lua', 'src');
-const SIM = 'D:/miliastra-beyond-simulator/client/lua-runtime/node_modules/fengari/src/fengari.js';
+import { SIM_FENGARI as SIM, SIM_ENTRY } from './sim-root.mjs';   // 模拟器位置：一处解析（云电脑/本机通用）
 const argOf = (n, d) => { const h = process.argv.find(a => a.startsWith('--' + n + '=')); return h ? h.slice(n.length + 3) : d; };
 
 // ── 收集模块（按文件名，不含目录前缀；子目录用 "目录/文件名"）──
@@ -166,7 +166,7 @@ function bundle(entryName) {
 async function runLua(code, label) {
   if (!fs.existsSync(SIM)) return { skipped: true, logs: [] };
   const fengari = (await import(pathToFileURL(SIM).href)).default;
-  const { createRuntime } = await import(pathToFileURL('D:/miliastra-beyond-simulator/client/lua-runtime/src/index.js').href);
+  const { createRuntime } = await import(pathToFileURL(SIM_ENTRY).href);
   const rt = createRuntime({ canvasWidth: 1280, canvasHeight: 720 });
   const root = rt.addRoot({ name: 'Canvas', kind: 'container' });
   rt.registerTemplate(1, { kind: 'image' });

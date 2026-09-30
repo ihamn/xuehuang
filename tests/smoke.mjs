@@ -8,7 +8,13 @@ import path from 'node:path';
 import vm from 'node:vm';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
-const html = fs.readFileSync(path.join(ROOT, '雪皇的后厨.html'), 'utf8');
+// ★ 支持 --html=<文件>（2026-10-01）：默认测**原版**（还原度基准，不许改）；
+//   改良在 雪皇的后厨-改良.html 里做，用 --html=雪皇的后厨-改良.html 跑同一套冒烟。
+const HTML_ARG = (process.argv.find(a => a.startsWith('--html=')) || '').slice(7);
+const HTML_FILE = HTML_ARG ? path.resolve(ROOT, HTML_ARG) : path.join(ROOT, '雪皇的后厨.html');
+if (!fs.existsSync(HTML_FILE)) { console.error('找不到 HTML：' + HTML_FILE); process.exit(2); }
+console.log('冒烟对象：' + path.relative(ROOT, HTML_FILE) + '（' + fs.statSync(HTML_FILE).size + ' 字节）');
+const html = fs.readFileSync(HTML_FILE, 'utf8');
 const i = html.indexOf('<script>'), j = html.lastIndexOf('</script>');
 const code = html.slice(i + 8, j);
 
@@ -160,7 +166,11 @@ sandbox.__TRACE__ = [];
                     小票全靠游戏自己"自动流转"到下一手（这就是要验的那条链路）
    再加一个反例断言：关掉自动流转后，只点按钮应该一杯都出不了（证明开关真的在管事）。 */
 const AUTO_ONLY = process.argv.includes('--auto');
-K.start(process.argv[2] === 'slow' ? 'slow' : 'fast');
+// ★ 模式选择（2026-10-01 修正）：quick / fast / slow 三个都认。
+//   原写法是 `argv[2]==='slow' ? 'slow' : 'fast'` ⇒ **传 quick 会被静默忽略**，
+//   于是"我用了快模式"其实一直在跑 fast（这类"参数被吞"的坑最费时间）。
+const MODE_ARG = process.argv.slice(2).find(a => a === 'quick' || a === 'fast' || a === 'slow') || 'fast';
+K.start(MODE_ARG);
 K.G().fx = false;                     // ★ 关掉纯装饰（吐司/飘字/抖屏）：自检不需要，开着会把这套测试拖成几分钟
 const G0 = K.G();
 const totalSec = K.CFG.modes[G0.mode].total;
@@ -184,10 +194,18 @@ function clickStation(id) {
 //   整局要跑一万多帧、把验证变成几分钟的事 —— 而它要证明的东西（不崩、闭环通、上限守住）
 //   在第 1 天就已经能证明了。手感/节奏这类东西本来也不该靠它验。
 const FULL_RUN = process.argv.includes('--full');
+
+// ★ 快速档旋钮（2026-10-01，手机上的自检太慢）：
+//   --skip-units     跳过 5 段定向单测，只跑主循环（纯跑法变化，不改仿真精度）
+//   --seconds=N      主循环**再跑 N 秒游戏时间**就收工（从主跑开始算起，不是从开局）
+//   ⚠️ 两者都只减少"跑多少"，不改变任何断言口径；被跳过的断言会在结果里列出来。
+const SKIP_UNITS = process.argv.includes('--skip-units');
+const SECONDS_CAP = Number((process.argv.find(a => a.startsWith('--seconds=')) || '').slice(10)) || 0;
 const STOP_DAY = FULL_RUN ? 99 : 2;      // 默认：进入第 2 天（= 第 1 天已结算过）就收工
 
-function runLoop(withRouting, maxTicks) {
-  while (!K.G().ended && ticks < (maxTicks || 60 * 60 * 60) && K.G().day < STOP_DAY) {
+function runLoop(withRouting, maxTicks, capSec) {
+  const capAt = capSec ? K.G().elapsed + capSec : 0;   // ★ 从"主跑开始那一刻"起算
+  while (!K.G().ended && ticks < (maxTicks || 60 * 60 * 60) && K.G().day < STOP_DAY && (!capAt || K.G().elapsed < capAt)) {
     ticks++;
     // ① 下单：有订单还没起杯，就照着配方起一杯（等价于玩家点手册 / 按数字键）
     for (const r of K.RECIPES) {
@@ -228,12 +246,13 @@ function runLoop(withRouting, maxTicks) {
   }
 }
 
+if (!SKIP_UNITS) {   // ★ 5 段定向单测（手机上是耗时大头；--skip-units 跳过，断言会在结果里标出）
 // ── 反例：关掉"自动流转"，机器人自己拖票（票照样有），应该一次都不触发自动流转 ──
 K.toggleAuto();                       // 自动流转 开 → 关
 const offBefore = K.G().autoMoves;
 runLoop(true, 150);                   // 5 秒游戏时间：机器人显式拖票 + 点按钮（只为造出"在制+排队"的局面；原来跑 900 帧纯属浪费，我的假 DOM 每帧重建队列）
-const offMoves = K.G().autoMoves - offBefore;
-const offTicks = ticks;
+var offMoves = K.G().autoMoves - offBefore;
+var offTicks = ticks;
 K.toggleAuto();                       // 关 → 开
 
 // ── 定向单测：自动流转到底有没有动小票 ──────────────────────────
@@ -258,7 +277,7 @@ K.toggleAuto();                       // 关 → 开
 // ── 定向单测：后厨"同时最多 3 个未完成任务（小票）"这条规矩是不是真的在管事 ──
 // 做法：停掉自然到店，连开 4 单（保证 > 3 杯），验"在制任务数 == 上限、没名额的杯不起票"；
 //       然后出掉一杯 → 名额必须立刻让给下一张票。
-const enforced = (() => {
+var enforced = (() => {
   const g = K.G();
   const CAP = K.CFG.kitchen.maxWip;
   g.nextArrive = 1e9;                                  // 停止自然到店，避免干扰计数
@@ -282,7 +301,7 @@ const enforced = (() => {
 // ── 定向单测：排队也吃耐心（只是慢一档） ──────────────────────────
 // 做法：把在制名额压到 1，连开 4 单（1 张票在制 + 其余排队），停掉自然到店只推时间，
 //       分别量"在制那单"和"排队那单"的耐心掉落速度。
-const patTest = (() => {
+var patTest = (() => {
   const g = K.G();
   g.nextArrive = 1e9;
   g.orders = []; g.slips = [];
@@ -303,7 +322,7 @@ const patTest = (() => {
 })();
 
 // ── 定向单测：耐心随"点的杯数"动态变化（抽样一批订单看趋势） ────────
-const patienceByCups = (() => {
+var patienceByCups = (() => {
   const g = K.G();
   const keepOrders = g.orders.slice(), keepSlips = g.slips.slice();
   g.orders = []; g.slips = [];
@@ -330,7 +349,7 @@ const patienceByCups = (() => {
 // ⚠️ 这里**不能**为了攒样本而多推时间：主跑要吃掉 5 天（10/20 分钟）的全部时钟预算，
 //    多推一秒都会把主跑的出餐数压低（踩过：出餐 138 → 83）。
 //    所以分两截验：① 用真实样本验"间隔确实在变"；② 用配置直接验"逐日收紧"的公式。
-const arriveTest = (() => {
+var arriveTest = (() => {
   const A = K.CFG.arrive;
   const L = K.G().arriveLog || [];
   const uniq = new Set(L).size;
@@ -342,14 +361,21 @@ const arriveTest = (() => {
 })();
 
 K.G().nextArrive = 2;                 // 单测里把"下次到店"推到很远用来停客，跑主跑前必须还回来
+}   // ★ 单测区结束
+if (SKIP_UNITS) {
+  console.log('⚠️ --skip-units：已跳过 5 段定向单测（连开4单上限 / 排队耐心 / 杯数→耐心 / 到店时间 / 自动流转反例）——本次结果不含这些断言');
+  offMoves = 0; offTicks = 0;
+  enforced = { ok: true }; patTest = { ok: true, wDrop: 0, aDrop: 0 };
+  patienceByCups = { ok: true }; arriveTest = { ok: true, uniq: 0, day1: 0, day5: 0 };
+}
 if (AUTO_ONLY) K.toggleTicket();
 K.resetClock();
 const routedBeforeMain = routed;      // 反例那段自己也"拖过票"，主跑只看增量
 console.log(`    [状态] 主跑开始前：auto(自动流转)=${K.G().auto} autoTicket(自动出票)=${K.G().autoTicket}`);
 
 try {
-  if (AUTO_ONLY) runLoop(false);      // 小票全靠自动流转走
-  else runLoop(true);                 // 手动拖拽跑完整局
+  if (AUTO_ONLY) runLoop(false, undefined, SECONDS_CAP);   // 小票全靠自动流转走
+  else runLoop(true, undefined, SECONDS_CAP);              // 手动拖拽
 } catch (e) {
   errs.push('主循环抛异常：' + e.message + '\n' + e.stack);
 }
@@ -359,7 +385,7 @@ const routedMain = routed - routedBeforeMain;    // 主跑期间机器人自己�
 const slipsAuto = G.autoTicket;
 console.log('─'.repeat(66));
 console.log(`局时长设定 ${totalSec}s · 模拟推进 ${(ticks * DT).toFixed(1)}s（时间流速会让游戏内时间按 x1 上下浮动）`);
-console.log(`跑法：${AUTO_ONLY ? '纯自动流转（机器人不碰 routeSlip）' : '手动拖拽（机器人显式分流）'}`);
+console.log(`跑法：${SKIP_UNITS ? '【跳过单测】' : ''}${SECONDS_CAP ? '【主跑上限 ' + SECONDS_CAP + 's】' : ''}${AUTO_ONLY ? '纯自动流转（机器人不碰 routeSlip）' : '手动拖拽（机器人显式分流）'}`);
 console.log(`出餐 ${G.served} 杯 · 翻车 ${G.mistakes} · 流失 ${G.left} · 结余 ¥${G.money} · 营业额分 ${G.score} · 最高连击 x${G.maxCombo}`);
 console.log(`机器人动作：手动分流 ${routed} 次 / 手动起杯 ${started} 次 / 完成步骤 ${steps} 次`);
 console.log(`后厨容量：在制任务峰值 ${maxWip} 个（上限 ${K.CFG.kitchen.maxWip}）· 出现排队的帧数 ${sawWaiting} · 僵尸票帧数 ${zombieSlips} · 小票峰值 ${maxSlips}`);
@@ -379,12 +405,21 @@ console.log('─'.repeat(66));
 
 let bad = 0;
 const chk = (ok, msg) => { console.log((ok ? '  ✓ ' : '  ✗ ') + msg); if (!ok) bad++; };
+// ★ 秒级档专用：**依赖时间与随机**的断言在 20 秒里必然随机红（客流/出餐/分流都是概率事件），
+//   所以这类断言在 --seconds 模式下"不判"，只播报 —— 否则你会以为是改坏了（这次就误判了一次）。
+const chkTimed = (ok, msg) => {
+  if (SECONDS_CAP) console.log(`ℹ️ 【秒级档】不判「${msg}」（依赖时间/随机，需常规档）`);
+  else chk(ok, msg);
+};
 chk(errs.length === 0, '主循环没有抛异常');
 if (FULL_RUN) chk(G.ended === true, '跑到第 5 天自动结算');
+else if (SECONDS_CAP) console.log(`ℹ️ 【秒级档】不判「跑到第 2 天」（本次只跑主循环 ${SECONDS_CAP}s，跨天断言留给常规档）`);
 else chk(G.day >= 2, `跑到第 ${G.day} 天（默认骨架模式：只验到跨过第 1 天结算；整局用 --full）`);
-chk(G.served > 0, '至少出过一杯（点单→小票→工位→出餐闭环通了）');
-chk(G.served + G.left > 0, '有客人来过');
-chk(!!(doc.body.children.length), '当日结算页/总结算弹出来了');
+if (SECONDS_CAP) console.log(`ℹ️ 【秒级档】不判「至少出过一杯」（本次出餐 ${G.served} 杯；闭环断言留给常规档）`);
+else chk(G.served > 0, '至少出过一杯（点单→小票→工位→出餐闭环通了）');
+chkTimed(G.served + G.left > 0, '有客人来过');
+if (SECONDS_CAP) console.log('ℹ️ 【秒级档】不判「结算页弹出」（没跑完一天）');
+else chk(!!(doc.body.children.length), '当日结算页/总结算弹出来了');
 chk(K.RECIPES.length >= 6, `产品数 ${K.RECIPES.length} ≥ 6`);
 chk(K.RECIPES.every(r => r.steps.length >= 2 && r.steps.every(s => K.S[s.st])), '每个产品的每一步都落在真实工位上');
 chk(REG.st.length === 5, '5 个工位都建出来了');
@@ -392,20 +427,21 @@ chk(maxWip <= K.CFG.kitchen.maxWip, `★ 后厨同时最多 ${K.CFG.kitchen.maxW
 chk(zombieSlips === 0, `★ 没有僵尸票（"杯子做完了但票说没做完"的帧数 = ${zombieSlips}）`);
 if (zombieSample.length) console.log('    [僵尸票样本] ' + zombieSample.join('  ||  '));
 console.log('    [ztrace] ' + (sandbox.__ZTRACE__ || []).slice(0, 20).join(' , '));
-chk(enforced.ok, `★ 定向单测：连开 4 单 → 在制恰好 ${enforced.wip1}（票 ${enforced.slips1} / 拿名额的杯 ${enforced.ready1}）→ 出掉一杯后立刻补到 ${enforced.wip2}`);
-chk(patTest.ok, `★ 排队也吃耐心：排队掉得比在制慢（${patTest.wDrop.toFixed(1)}s vs ${patTest.aDrop.toFixed(1)}s / 10s）`);
-chk(arriveTest.ok, `★ 到店时间动态且逐日收紧：${arriveTest.uniq} 种取值，按公式 ${arriveTest.day1.toFixed(1)}s → ${arriveTest.day5.toFixed(1)}s`);
-chk(patienceByCups.ok, '★ 耐心随「点的杯数」动态变化：杯数越多给得越宽（均值单调递增）');
-chk(offMoves === 0, `★ 关掉自动流转后，${(offTicks * DT).toFixed(0)}s 内自动流转 0 次（开关真的在管事）`);
+if (!SKIP_UNITS) chk(enforced.ok, `★ 定向单测：连开 4 单 → 在制恰好 ${enforced.wip1}（票 ${enforced.slips1} / 拿名额的杯 ${enforced.ready1}）→ 出掉一杯后立刻补到 ${enforced.wip2}`);
+if (!SKIP_UNITS) chk(patTest.ok, `★ 排队也吃耐心：排队掉得比在制慢（${patTest.wDrop.toFixed(1)}s vs ${patTest.aDrop.toFixed(1)}s / 10s）`);
+if (!SKIP_UNITS) chk(arriveTest.ok, `★ 到店时间动态且逐日收紧：${arriveTest.uniq} 种取值，按公式 ${arriveTest.day1.toFixed(1)}s → ${arriveTest.day5.toFixed(1)}s`);
+if (!SKIP_UNITS) chk(patienceByCups.ok, '★ 耐心随「点的杯数」动态变化：杯数越多给得越宽（均值单调递增）');
+if (!SKIP_UNITS) chk(offMoves === 0, `★ 关掉自动流转后，${(offTicks * DT).toFixed(0)}s 内自动流转 0 次（开关真的在管事）`);
 if (!AUTO_ONLY) {
-  chk(slipsAuto && G.served > 0, '★ 自动出小票 + 自动流转：机器人一次 startCup 都没调，靠自动票出餐');
-  chk(routed > 0, `★ 手动拖票这条路还在（机器人自己分流 ${routed} 次）`);
+  chkTimed(slipsAuto && G.served > 0, '★ 自动出小票 + 自动流转：机器人一次 startCup 都没调，靠自动票出餐');
+  chkTimed(routed > 0, `★ 手动拖票这条路还在（机器人自己分流 ${routed} 次）`);
 }
 if (AUTO_ONLY) {
-  chk(G.served > 0 && routedMain === 0, `★ 主跑期间机器人一次 routeSlip 都没调（${started} 次手动起杯），靠自动流转出餐 ${G.served} 杯`);
-  chk(autoMoves > 0, `★ 游戏自己流转了 ${autoMoves} 次`);
+  chkTimed(G.served > 0 && routedMain === 0, `★ 主跑期间机器人一次 routeSlip 都没调（${started} 次手动起杯），靠自动流转出餐 ${G.served} 杯`);
+  chkTimed(autoMoves > 0, `★ 游戏自己流转了 ${autoMoves} 次`);
 }
 if (errs.length) { console.log('\n异常详情：\n' + errs.join('\n')); bad++; }
 
+if (SKIP_UNITS || SECONDS_CAP) console.log(`【本次档位】${SKIP_UNITS ? '跳过单测 ' : ''}${SECONDS_CAP ? '主跑上限 ' + SECONDS_CAP + 's ' : ''}⇒ 这不是全量结果，交付前请跑默认档/--full`);
 console.log(bad ? `\n冒烟测试：${bad} 项失败` : '\n冒烟测试：全部通过 ✓');
 process.exit(bad ? 1 : 0);

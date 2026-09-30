@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>炮筒喷火 · 虚拟按键微量测试</title>
+<style>
+  :root{ --bg:#0e1016; --panel:#1a2030; --line:#2c364d; --ink:#e9eefb; --dim:#8e9bb5; --ok:#5fe08a; --bad:#ff6b6b; --gold:#ffcf6b; }
+  *{box-sizing:border-box} html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,"PingFang SC",sans-serif;padding:10px 10px 190px;user-select:none;-webkit-user-select:none}
+  h1{font-size:16px;margin:4px 0 2px}
+  .hint{color:var(--dim);font-size:12px;margin:0 0 10px}
+  section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:10px}
+  section h2{font-size:13px;margin:0 0 8px;color:var(--gold)}
+  b{color:#fff}
+  .row{display:flex;justify-content:space-between;gap:8px;padding:3px 0;font-variant-numeric:tabular-nums}
+  .barwrap{height:10px;background:#0b0e15;border-radius:6px;overflow:hidden;margin-top:6px}
+  .bar{height:100%;width:0%;background:linear-gradient(90deg,#7ee0ff,#5fe08a);transition:width .05s linear}
+  .ok{color:var(--ok)} .bad{color:var(--bad)}
+  /* 横向滑块：手机上比一排小按钮好点得多 */
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:34px;background:transparent;margin:2px 0}
+  input[type=range]::-webkit-slider-runnable-track{height:8px;border-radius:4px;background:#2b3550}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:30px;height:30px;margin-top:-11px;
+    border-radius:50%;background:#6ea8ff;border:2px solid #cfe1ff}
+  input[type=range]::-moz-range-track{height:8px;border-radius:4px;background:#2b3550}
+  input[type=range]::-moz-range-thumb{width:26px;height:26px;border-radius:50%;background:#6ea8ff;border:2px solid #cfe1ff}
+  #pad{position:fixed;left:0;right:0;bottom:0;background:#121722ee;border-top:1px solid var(--line);padding:8px 8px calc(8px + env(safe-area-inset-bottom));z-index:99999;backdrop-filter:blur(6px)}
+  #pad .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+  #pad .grid.n8{grid-template-columns:repeat(8,1fr);margin-top:6px}
+  button.vk{appearance:none;border:1px solid #3a4560;background:#222b3f;color:var(--ink);border-radius:10px;padding:12px 4px;font:600 13px/1.15 system-ui;touch-action:manipulation;min-height:46px}
+  button.vk small{display:block;font-weight:500;color:var(--dim);font-size:10px;margin-top:3px}
+  button.vk:active,button.vk.on{background:#3a7bd5;border-color:#6ea8ff}
+  button.vk.wide{grid-column:span 2}
+
+  /* ---------- 炮筒喷火舞台（规格与 lua/src/props.lua 的 P.spec 一致） ---------- */
+  #stage{position:relative;height:clamp(210px,40vh,330px);   /* 手机上自动变矮成"横条" */border-radius:12px;border:1px solid var(--line);
+         background:radial-gradient(300px 180px at 50% 78%,#1a2133,#0b0e15 70%);overflow:hidden;margin-bottom:10px;
+         touch-action:none}
+  #prop{--s:.86;position:absolute;left:50%;bottom:26px;transform:translateX(-50%) scale(var(--s));transform-origin:50% 100%}
+  #cone{--mw:120px;--mh:18px;--gw:84px;--gh:34px;--tw:104px;--th:214px;--tipw:6px;
+        position:relative;width:var(--mw);cursor:pointer}
+  #mouth{position:relative;width:var(--mw);height:var(--mh);background:#f2d7a6;border-radius:4px 4px 2px 2px}
+  #inner{position:absolute;left:50%;top:calc(var(--mh) * .25);transform:translateX(-50%);width:calc(var(--mw) - var(--mw) * 0.23);height:calc(var(--mh) * .45);background:#5a3a1c;border-radius:2px}
+  #grip{position:relative;width:var(--gw);height:var(--gh);background:#2f3a52;margin:0 auto;border-radius:2px}
+  #tri{position:relative;width:var(--tw);height:var(--th);margin:0 auto;background:#e0b072;
+       clip-path:polygon(0 0,100% 0,calc(50% + var(--tipw) / 2) 100%,calc(50% - var(--tipw) / 2) 100%)}
+  #shine{position:absolute;left:calc(50% - var(--tw) * .22 - 4px);top:calc(var(--mh) + var(--gh) + var(--th) * .28);width:8px;height:calc(var(--th) * .72);background:rgba(255,255,255,.35);border-radius:4px}
+  #fireWrap{position:absolute;left:50%;bottom:100%;transform:translateX(-50%);
+            /* ★ 对齐量（2026-10-01）：bottom:100% 让火焰底边**正好落在火炬顶边**；
+               下面的变量是"额外偏移"，默认 0 = 严丝合缝对齐。
+               原来是写死的 -6px（把火压进筒口 6px），已改。 */
+            margin-bottom:var(--fireGap,0px);
+            display:grid;pointer-events:none}
+  #fireWrap i{display:block;background:transparent}
+  /* 字符渲染层（模拟千星：按热度分层，每层一个文本框） */
+  .charlayer{position:absolute;left:0;bottom:0;margin:0;padding:0;white-space:pre;display:none;
+    font-family:"Noto Sans CJK SC","Source Han Sans SC","PingFang SC","Microsoft YaHei",sans-serif;
+    letter-spacing:0;text-align:left;pointer-events:none}
+  #stage .hud{position:absolute;left:10px;top:8px;font-size:12px;color:var(--dim);line-height:1.7}
+  #stage .hud b{color:#fff}
+  #stage .tip{position:absolute;right:10px;top:8px;font-size:12px;color:var(--gold);text-align:right}
+  /* 出餐：**枪筒本体（连着火）飞出去** —— 出餐的就是这支冒着火的枪筒（它=甜筒），
+     不是一个另外的杯子。 */
+  #prop.out{animation:serveOut 900ms ease-in forwards}
+  @keyframes serveOut{
+    0%{transform:translateX(-50%) scale(var(--s))}
+    22%{transform:translateX(-50%) translateY(-8px) scale(calc(var(--s) * 1.02))}
+    100%{transform:translateX(-50%) translateY(-170px) scale(calc(var(--s) * .9));opacity:0}
+  }
+  /* ★ 只给 translateY：`#cone` **不是绝对定位**，加 translateX(-50%) 会让它在冒火时
+     整整左移半个宽度（90px）——表现就是"火在原地、枪筒跑到旁边"。
+     这个 -50% 是从 #prop 的居中规则抄来的，抄错了元素。 */
+  .firing #cone{transform:translateY(2px)}
+  .firing #tri{filter:brightness(1.06)}
+  #togglePad{position:fixed;right:10px;bottom:8px;z-index:100000;display:none}
+</style>
+</head>
+<body>
+<h1>炮筒喷火 · 虚拟按键微量测试</h1>
+<p class="hint">目的：在手机上验证「点按钮 = 按下真键」。通过后再整体搬进《改良版》。<br>
+移植到千星时键位不同（平台没有 B/C 键）：捣锤 <b>Y</b> / 火系 <b>H</b> / 化学 <b>K</b> / 萃茶 <b>P</b>。</p>
+
+<section id="stage">
+  <div class="hud">
+    规格（与 props.lua 同一套数）：筒口 180×20 · 握把 140×26 · 锥体 160×182（尖宽 10）<br>
+    形状 <b id="stShape">三角（现状）</b> · 火：<b id="stGrid">16×27 = 432</b> 格 · 每格 4×3 · 25 级 DOOM 调色板<br>
+    帧率 <b id="stFps">—</b> · 已烧 <b id="stFrames">0</b> 帧 · 已出餐 <b id="stServed">0</b>
+  </div>
+  <div class="tip">按一下 <b>H</b>（或点一下<b>枪筒</b>）→ <b>枪筒冒火</b> → <b>带火直接出餐</b><br>（出餐的就是这支冒着火的枪筒）</div>
+    <div id="prop">
+    <div id="fireWrap"></div>
+    <div id="cone">
+      <div id="mouth"><div id="inner"></div></div>
+      <div id="grip"></div>
+      <div id="tri"></div>
+      <div id="shine"></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <h2>① 键盘事件观察窗（只监听，不改动）</h2>
+  <div class="row"><span>最近一次</span><b id="vLast">—</b></div>
+  <div class="row"><span>计数</span><span>keydown <b id="vDown">0</b> · keyup <b id="vUp">0</b> · 不同键 <b id="vKeys">0</b></span></div>
+  <div class="row"><span>最近一次按住时长</span><b id="vHold">—</b></div>
+</section>
+
+<section>
+  <h2>② 三个"像游戏一样"的目标</h2>
+  <div class="row"><span>按住类：按住 <b>P</b> 满 0.9 秒</span><b id="tHold">未完成</b></div>
+  <div class="barwrap"><div class="bar" id="tHoldBar"></div></div>
+  <div class="row"><span>连按类：连按 <b>B</b> 三下</span><b id="tTap">0 / 3</b></div>
+  <div class="row"><span>开关类：按 <b>A</b> 切换</span><b id="tToggle">关</b></div>
+</section>
+
+<section>
+  <h2>③ 形状（细梗长三角在这里切）</h2>
+  <div class="grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px">
+    <button class="vk" data-shape="tri">三角（现状 16×27）</button>
+    <button class="vk" data-shape="slim">细长三角（9×36）</button>
+    <button class="vk" data-shape="stem">细梗 + 长三角</button>
+    <button class="vk" data-shape="candle">烛焰（中段最宽）</button>
+  </div>
+  <div class="row" style="margin-top:8px"><span>渲染方式</span><button class="vk" id="btnChar" style="min-height:34px;padding:6px 12px">切成「字符 █」</button></div>
+  <div class="row"><span>说明</span><span style="font-size:11px;color:var(--dim);text-align:right">
+    字符方案 = 按热度分 4 层、每层一个文本框；<br>格子必须近似**正方形**（字形不能单独拉伸）</span></div>
+</section>
+
+<section>
+  <h2>③-b 枪筒（往"火炬"靠：细 + 陡 + 小）</h2>
+  <div class="grid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px" id="coneBtns"></div>
+  <div class="row" style="margin-top:8px"><span>当前</span><b id="roCone">—</b></div>
+</section>
+
+<section>
+  <h2>④ 比例（火太小 / 枪筒太大的话，调这两个）</h2>
+  <div class="row"><span>火焰格大小（底宽 = 16 格）</span><span id="roCell">—</span></div>
+  <div class="grid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">
+    <button class="vk" data-cell="4,3">4×3</button>
+    <button class="vk" data-cell="6,4.5">6×4.5</button>
+    <button class="vk" data-cell="8,6">8×6</button>
+    <button class="vk" data-cell="9,6.75">9×6.75</button>
+    <button class="vk" data-cell="fit">=筒口宽</button>
+  </div>
+  <div class="row" style="margin-top:8px"><span>整支缩放（拖动横条）</span><span id="roScale">—</span></div>
+  <input type="range" id="scaleRange" min="0.3" max="1.5" step="0.01" value="0.86">
+  <div class="grid" style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">
+    <button class="vk" data-scale="0.55">0.55</button>
+    <button class="vk" data-scale="0.7">0.70</button>
+    <button class="vk" data-scale="0.86">0.86</button>
+    <button class="vk" data-scale="1.0">1.00</button>
+    <button class="vk" data-scale="1.2">1.20</button>
+    <button class="vk" id="btnAutoFit" style="grid-column:span 2">自动适配</button>
+  </div>
+  <div class="row" style="margin-top:8px"><span>火焰底边 ↔ 火炬顶边</span><span id="roAlign">—</span></div>
+  <input type="range" id="alignRange" min="-24" max="24" step="1" value="0">
+  <div class="row"><span>说明</span><span style="font-size:11px;color:var(--dim);text-align:right">
+    0 = 火的下部与火炬上部严丝合缝<br>正数 = 火往上抬；负数 = 火压进筒口</span></div>
+  <div class="row" style="margin-top:8px"><span>读数</span><b id="roInfo">—</b></div>
+</section>
+
+<section>
+  <h2>④ 火焰档位（这是待定的设计决策）</h2>
+  <div class="row"><span>16×27 = 432 格（精细，控件成本高）</span><button class="vk" id="btnD16" style="min-height:34px;padding:6px 12px">用这档</button></div>
+  <div class="row"><span>12×20 = 240 格（省一半，火舌略粗）</span><button class="vk" id="btnD12" style="min-height:34px;padding:6px 12px">用这档</button></div>
+</section>
+
+<section>
+  <h2>④ 自检（点一下，页面自己按一遍）</h2>
+  <div class="row"><span id="scText">待运行</span><button class="vk" id="scRun" style="min-height:34px;padding:6px 12px">跑自检</button></div>
+</section>
+
+<div id="pad">
+  <div class="grid" id="padMain"></div>
+  <div class="grid n8" id="padNum"></div>
+</div>
+
+<script>
+/* =========================================================================
+   虚拟按键组件（VKP）—— 这一块是**要搬进改良版**的东西，独立、无依赖。
+   设计要点（都是踩过才知道的）：
+   1) 用 pointerdown/pointerup，**不是 click** —— 游戏里"按住类"靠 keyup 收手，
+      必须在抬手那一刻发 keyup；click 太晚、而且没有取消路径。
+   2) pointercancel / pointerleave 也要补 keyup —— 手指滑出按钮时若不补，
+      游戏会以为你一直按着（那会让"按住类"永远停不下来）。
+   3) 空格既要 key=' ' 也要 code='Space'（游戏两个判据都用）。
+   4) 不发 repeat 事件：重复是按住的自然结果，假按键发 repeat 会打乱"连按类"计数。
+   5) 不碰游戏的类名（.act/.st/.rec…）：我们的按钮一律 .vk- 前缀。
+   ========================================================================= */
+window.VKP = (function(){
+  // ★ 唯一键位表（按钮与派发都从它来，避免两处写不一样）
+  var KEYMAP = [
+    { key:'b',        code:'KeyB',  label:'捣锤',   sub:'B'  },
+    { key:'h',        code:'KeyH',  label:'火系',   sub:'H'  },
+    { key:'c',        code:'KeyC',  label:'化学',   sub:'C'  },
+    { key:'p',        code:'KeyP',  label:'萃茶',   sub:'P'  },
+    { key:' ',        code:'Space', label:'打包',   sub:'空格' },
+    { key:'Escape',   code:'Escape',label:'暂停',   sub:'Esc' },
+    { key:'a',        code:'KeyA',  label:'自动流转', sub:'A' },
+    { key:'s',        code:'KeyS',  label:'自动出票', sub:'S' }
+  ];
+  var NUMKEYS = [1,2,3,4,5,6,7,8];
+
+  function specOf(key){
+    for (var i=0;i<KEYMAP.length;i++) if (KEYMAP[i].key === key) return KEYMAP[i];
+    if (/^[1-8]$/.test(key)) return { key:key, code:'Digit'+key, label:'起杯 ' + key, sub:key };
+    return { key:key, code:'', label:key, sub:'' };
+  }
+  function fire(type, key, target){
+    var spec = specOf(key);
+    var ev;
+    try {
+      ev = new KeyboardEvent(type, { key:spec.key, code:spec.code, bubbles:true, cancelable:true, repeat:false });
+    } catch (e) {                                   // 极老环境兜底（只保 key）
+      ev = document.createEvent('Event'); ev.initEvent(type, true, true); ev.key = spec.key; ev.code = spec.code;
+    }
+    ev.__vkp = true;                                // 标记：这是我们发的（便于自检/排除真键盘）
+    (target || window).dispatchEvent(ev);
+    return spec;
+  }
+  return { KEYMAP: KEYMAP, NUMKEYS: NUMKEYS, specOf: specOf, fire: fire };
+})();
+
+/* ---------------------- 页面接线（搬进改良版时这一块照抄） ---------------------- */
+(function(){
+  if (typeof document === 'undefined' || !document.getElementById) return;   // 允许在 node 里只测 VKP
+  var $ = function(id){ return document.getElementById(id); };
+
+  // 观察窗：只统计我们自己发的键（真键盘也会进来，标出来）
+  var nDown = 0, nUp = 0, seen = {}, lastDownAt = 0;
+  function render(){
+    $('vDown').textContent = nDown; $('vUp').textContent = nUp;
+    $('vKeys').textContent = Object.keys(seen).length;
+  }
+  window.addEventListener('keydown', function(e){
+    nDown++; seen[e.key] = 1;
+    lastDownAt = Date.now();
+    $('vLast').textContent = (e.__vkp ? '虚拟 ' : '真键盘 ') + JSON.stringify(e.key) + ' / ' + (e.code || '-');
+    render();
+  }, true);
+  window.addEventListener('keyup', function(e){
+    nUp++;
+    if (lastDownAt) $('vHold').textContent = (Date.now() - lastDownAt) + ' ms';
+    render();
+  }, true);
+
+  // 目标 1：按住类（0.9 秒）
+  var holdT = null, holdStart = 0;
+  window.addEventListener('keydown', function(e){
+    if (e.key !== 'p' || holdT) return;
+    holdStart = Date.now();
+    holdT = setInterval(function(){
+      var pct = Math.min(100, (Date.now() - holdStart) / 900 * 100);
+      $('tHoldBar').style.width = pct + '%';
+      if (pct >= 100) { $('tHold').textContent = '完成 ✓'; $('tHold').className = 'ok'; }
+    }, 30);
+  });
+  window.addEventListener('keyup', function(e){
+    if (e.key !== 'p' || !holdT) return;
+    clearInterval(holdT); holdT = null;
+    if ($('tHold').className !== 'ok') { $('tHoldBar').style.width = '0%'; $('tHold').textContent = '未完成（没按满 0.9 秒）'; }
+  });
+
+  // 目标 2：连按类
+  var taps = 0;
+  window.addEventListener('keydown', function(e){
+    if (e.key !== 'b') return;
+    taps++; $('tTap').textContent = taps + ' / 3';
+    if (taps >= 3) { $('tTap').textContent = '完成 ✓'; $('tTap').className = 'ok'; }
+  });
+
+  // 目标 3：开关类
+  var tg = false;
+  window.addEventListener('keydown', function(e){
+    if (e.key !== 'a') return;
+    tg = !tg; $('tToggle').textContent = tg ? '开' : '关';
+    $('tToggle').className = tg ? 'ok' : '';
+  });
+
+  // 建按键：pointerdown → keydown，pointerup/cancel/leave → keyup
+  var pressed = {};
+  function mkBtn(key){
+    var spec = VKP.specOf(key);
+    var b = document.createElement('button');
+    b.className = 'vk'; b.type = 'button';
+    b.setAttribute('data-vkey', spec.key);
+    b.setAttribute('data-vcode', spec.code);
+    b.innerHTML = spec.label + '<small>' + (spec.sub || '') + '</small>';
+    var down = function(ev){
+      ev.preventDefault();
+      if (pressed[key]) return;
+      pressed[key] = 1; b.classList.add('on');
+      VKP.fire('keydown', key);
+      if (navigator.vibrate) { try { navigator.vibrate(8); } catch (e) {} }
+    };
+    var up = function(ev){
+      if (!pressed[key]) return;
+      pressed[key] = 0; b.classList.remove('on');
+      VKP.fire('keyup', key);
+    };
+    b.addEventListener('pointerdown', down);
+    b.addEventListener('pointerup', up);
+    b.addEventListener('pointercancel', up);
+    b.addEventListener('pointerleave', up);
+    b.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+    return b;
+  }
+  var main = $('padMain'), num = $('padNum');
+  for (var i = 0; i < VKP.KEYMAP.length; i++) main.appendChild(mkBtn(VKP.KEYMAP[i].key));
+  for (var j = 0; j < VKP.NUMKEYS.length; j++) num.appendChild(mkBtn(String(VKP.NUMKEYS[j])));
+
+  // 自检：自己按一遍，看观察窗有没有收到（证明"点按钮→事件真的发出去了"）
+  $('scRun').addEventListener('click', function(){
+    var before = nDown, beforeUp = nUp, keys = ['b','h','c','p',' ','Escape','a','s','1'];
+    for (var i = 0; i < keys.length; i++) {
+      VKP.fire('keydown', keys[i]);
+      VKP.fire('keyup', keys[i]);
+    }
+    var okDown = nDown - before === keys.length, okUp = nUp - beforeUp === keys.length;
+    $('scText').innerHTML = (okDown && okUp)
+      ? '<span class="ok">连通 ✓ 发出 ' + keys.length + ' 组，收到 ' + (nDown - before) + ' 下 / ' + (nUp - beforeUp) + ' 起</span>'
+      : '<span class="bad">未连通 ✗ 发出 ' + keys.length + ' 组，收到 ' + (nDown - before) + ' 下 / ' + (nUp - beforeUp) + ' 起</span>';
+  });
+
+
+  /* ===================== 炮筒喷火（照搬 lua/src/props.lua 的算法与数字） =====================
+     为什么要"照搬"而不是重写：网页是**看效果**的地方，千星才是落地的地方。
+     两边用同一套数字（格数/衰减/包络指数/调色板），网页上定下来的观感搬到千星才不会变。
+     ===================== */
+  var PAL = [[7,7,15,0],[26,10,10,40],[60,12,10,90],[100,15,12,140],[140,20,12,180],[176,28,12,210],
+    [206,40,12,235],[226,58,12,250],[238,78,14,255],[246,100,16,255],[250,120,18,255],[252,140,22,255],
+    [254,158,26,255],[255,172,34,255],[255,186,48,255],[255,198,66,255],[255,208,86,255],[255,216,108,255],
+    [255,224,132,255],[255,232,158,255],[255,238,182,255],[255,244,206,255],[255,249,226,255],[255,252,242,255],
+    [255,255,255,255]];
+  var NLEV = PAL.length;
+  var DECAY_MAX = 3, SOURCE_ROWS = 3;
+  // ★ 形状剖面（2026-10-01 新增）：形状 = 网格纵横比 + 逐行宽度剖面
+  //   · cols/rows 决定"细长"还是"矮胖"（细梗长三角要**窄而高**，例如 9×36）
+  //   · exp 越大收窄越快（1.5~1.8 才像细长三角；0.9 是原稿的矮胖三角）
+  //   · stem > 0 时，最底几行只留中间 1 格 ⇒ 那根"梗"
+  var SHAPES = [
+    { id:'tri',  label:'三角（现状）',       cols:16, rows:27, exp:0.9, stem:0 },
+    { id:'slim', label:'细长三角',           cols:9,  rows:36, exp:1.5, stem:0 },
+    { id:'stem', label:'细梗 + 长三角',      cols:9,  rows:36, exp:1.6, stem:5 },
+    { id:'candle', label:'烛焰（中段最宽）', cols:9,  rows:36, exp:1.2, stem:4, bulge:true },
+  ];
+  var EXP = 0.9, STEM = 0, BULGE = false;
+  var CELL_W = 4, CELL_H = 3;      // ★ 可调：火太小就把它调大（底宽 = cols × CELL_W）
+  var PROP_S = 0.86;               // ★ 可调：枪筒太大就把它调小
+  var FIRE_GAP = 0;                // ★ 火焰底边相对火炬顶边的额外偏移（0 = 对齐）；正数往上抬
+  // ★ 枪筒几何（2026-10-01 参数化）：细+陡 = 更像**火炬**（见 qilin 注释里的"火炬"那一层）
+  //   mw/mh 筒口 · gw/gh 握把 · tw/th 锥体 · tipw 锥尖宽 —— 与 props.lua 的 P.spec.cone 一一对应
+  var CONES = [
+    { id:'gun',   label:'旧·炮管（粗短）', mw:180, mh:20, gw:140, gh:26, tw:160, th:182, tipw:10 },
+    { id:'torch1',label:'火炬·细高',       mw:120, mh:18, gw:84,  gh:34, tw:104, th:214, tipw:6 },
+    { id:'torch2',label:'火炬·更细',       mw:100, mh:16, gw:70,  gh:40, tw:88,  th:244, tipw:5 },
+    { id:'torch3',label:'火炬·矮一点',     mw:132, mh:18, gw:92,  gh:30, tw:116, th:180, tipw:7 },
+  ];
+  var CONE = CONES[1];
+  function applyCone(id) {
+    var c = null;
+    for (var i = 0; i < CONES.length; i++) if (CONES[i].id === id) c = CONES[i];
+    if (!c) return;
+    CONE = c;
+    var el = $('cone');
+    el.style.setProperty('--mw', c.mw + 'px'); el.style.setProperty('--mh', c.mh + 'px');
+    el.style.setProperty('--gw', c.gw + 'px'); el.style.setProperty('--gh', c.gh + 'px');
+    el.style.setProperty('--tw', c.tw + 'px'); el.style.setProperty('--th', c.th + 'px');
+    el.style.setProperty('--tipw', c.tipw + 'px');
+    updateReadout();
+  }
+  function coneTotalH() { return CONE.mh + CONE.gh + CONE.th; }
+  var rngState = 20260927;
+  function rnd(n) { rngState = (rngState * 1103515245 + 12345) % 2147483648; return rngState % n; }
+
+  var fire = { cols: 16, rows: 27, cells: [], heat: [], last: [], drawn: 0, firing: false, tick: 0 };
+  var fps = { t: 0, n: 0, v: 0 };
+
+  function halfAt(r) {                       // r: 1=顶 rows=底
+    var t = (fire.rows - r) / Math.max(1, fire.rows - 1);   // 0=底 1=顶
+    var half = Math.floor(fire.cols / 2);
+    var h;
+    if (BULGE) {
+      // 烛焰：中段最宽（0.35 处），两端都收 —— 用两个方向的抛物线拼
+      var m = 0.35;
+      var k = t < m ? Math.pow(t / m, 0.75) : Math.pow((1 - t) / (1 - m), 1.35);
+      h = half * (0.25 + 0.75 * k);
+    } else {
+      h = half * Math.pow(1 - t, EXP);
+    }
+    // ★ 梗：最底几行只留中间 1 格（那一小簇就是"从筒口伸出来的梗"）
+    if (STEM > 0 && r > fire.rows - STEM) h = Math.min(h, 0.5);
+    return h < 0.5 ? 0.5 : h;
+  }
+  function cxOf() { return (fire.cols - 1) / 2; }
+  function allowed(c, r) { return Math.abs(c - cxOf()) <= halfAt(r); }
+
+  function buildFire(cols, rows) {
+    fire.cols = cols; fire.rows = rows;
+    fire.heat = []; fire.last = []; fire.cells = []; fire.drawn = 0;
+    var wrap = $('fireWrap');
+    wrap.innerHTML = '';
+    wrap.style.gridTemplateColumns = 'repeat(' + cols + ',' + CELL_W + 'px)';
+    wrap.style.gridTemplateRows = 'repeat(' + rows + ',' + CELL_H + 'px)';
+    updateReadout();
+    for (var i = 0; i < cols * rows; i++) { fire.heat[i] = 1; fire.last[i] = -1; }
+    for (var k = 0; k < cols * rows; k++) {
+      var d = document.createElement('i');
+      wrap.appendChild(d); fire.cells.push(d);
+    }
+    $('stGrid').textContent = cols + '×' + rows + ' = ' + (cols * rows);
+  }
+  function seed() {
+    // ★ 空闲 = **主动把底部降到余烬**，不是"什么都不做"：
+    //   DOOM 火焰的传播只把热量往上搬，**从不自己清除** —— 停止点火源它也会一直烧下去。
+    //   我第一版就是"空闲不 seed"，结果松开后总热量只降 7%（几乎常燃），
+    //   与设计稿「按住才烤」不符。这条是 tests/fire-port.mjs 抓出来的。
+    if (!fire.firing) {
+      for (var r0 = fire.rows - SOURCE_ROWS + 1; r0 <= fire.rows; r0++)
+        for (var c0 = 0; c0 < fire.cols; c0++) fire.heat[(r0 - 1) * fire.cols + c0] = 1;
+      return;
+    }
+    var rowsOn = SOURCE_ROWS;
+    for (var r = fire.rows - rowsOn + 1; r <= fire.rows; r++)
+      for (var c = 0; c < fire.cols; c++)
+        if (allowed(c, r)) fire.heat[(r - 1) * fire.cols + c] = NLEV;
+  }
+  function stepFire() {
+    seed();
+    for (var r = fire.rows; r >= 2; r--) {
+      var up = r - 1;
+      for (var c = 0; c < fire.cols; c++) {
+        var v = fire.heat[(r - 1) * fire.cols + c];
+        var iu = (up - 1) * fire.cols + c;
+        if (v <= 1) { fire.heat[iu] = 1; continue; }
+        var d = rnd(DECAY_MAX);
+        var nx = c + rnd(3) - 1;
+        if (nx < 0) nx = 0; else if (nx >= fire.cols) nx = fire.cols - 1;
+        var tgt = (up - 1) * fire.cols + nx;
+        if (!allowed(nx, up)) fire.heat[tgt] = 1;
+        else { var nv = v - d; fire.heat[tgt] = nv < 1 ? 1 : nv; }
+      }
+    }
+  }
+  // ★ 字符渲染模式（2026-10-01）：模拟千星的做法 —— **按热度分 4 层，每层一个文本框**，
+  //   空格必须用 U+3000（表意空格）才与全角方块等宽；行距这里能用 CSS 压到 = 字号
+  //   （⚠️ 千星**不能**设行距，所以浏览器这边是"最好情况"，真机以 glyph_probe 为准）。
+  var charMode = false, layerBoxes = [], cellMem = { w: 4, h: 3 };
+  var LAYERS = [
+    { max: 6,  color: 'rgba(120,24,14,.9)' },
+    { max: 13, color: 'rgba(248,92,20,.95)' },
+    { max: 20, color: 'rgba(255,172,32,1)' },
+    { max: 25, color: 'rgba(255,242,205,1)' },
+  ];
+  function ensureLayerBoxes() {
+    var wrap = $('fireWrap');
+    layerBoxes.forEach(function(b) { b.remove && b.remove(); });
+    layerBoxes = LAYERS.map(function(L, i) {
+      var pre = document.createElement('pre');
+      pre.className = 'charlayer';
+      pre.style.color = L.color;
+      wrap.appendChild(pre);
+      return pre;
+    });
+  }
+  function drawChars() {
+    var last = fire._lastStr || (fire._lastStr = []);
+    for (var li = 0; li < LAYERS.length; li++) {
+      var lo = li === 0 ? 1 : LAYERS[li - 1].max + 1, hi = LAYERS[li].max;
+      var rows = [];
+      for (var r = 1; r <= fire.rows; r++) {
+        var line = '';
+        for (var c = 0; c < fire.cols; c++) {
+          var v = fire.heat[(r - 1) * fire.cols + c];
+          line += (v >= lo && v <= hi) ? '\u2588' : '\u3000';   // █ / 表意空格
+        }
+        rows.push(line);
+      }
+      var s = rows.join('\n');
+      if (last[li] !== s) { last[li] = s; layerBoxes[li].textContent = s; }
+    }
+  }
+  function drawFire() {
+    for (var i = 0; i < fire.heat.length; i++) {
+      var v = fire.heat[i];
+      if (v === fire.last[i]) continue;            // 只写变化的格子（432 个 DOM 每帧全写太贵）
+      fire.last[i] = v;
+      var p = PAL[v - 1] || PAL[0];
+      var el = fire.cells[i];
+      el.style.background = p[3] === 0 ? 'transparent' : 'rgba(' + p[0] + ',' + p[1] + ',' + p[2] + ',' + (p[3] / 255) + ')';
+    }
+    fire.drawn++;
+    if (charMode) drawChars();
+  }
+  function applyShape(id) {
+    var s = null;
+    for (var i = 0; i < SHAPES.length; i++) if (SHAPES[i].id === id) s = SHAPES[i];
+    if (!s) return;
+    EXP = s.exp; STEM = s.stem || 0; BULGE = !!s.bulge;
+    buildFire(s.cols, s.rows);                       // 网格变了 → 重建
+    setCell(CELL_W, CELL_H);                         // 保住当前格大小
+    $('stShape') && ($('stShape').textContent = s.label);
+  }
+  function updateReadout() {
+    var fw = fire.cols * CELL_W, fh = fire.rows * CELL_H, th = coneTotalH();
+    $('roCell').textContent = '每格 ' + CELL_W + '×' + CELL_H + ' → 火 ' + fw + '×' + fh + 'px';
+    $('roScale').textContent = '×' + PROP_S;
+    $('roCone').textContent = CONE.label + '：筒口 ' + CONE.mw + '×' + CONE.mh + ' · 握把 ' + CONE.gw + '×' + CONE.gh
+      + ' · 锥体 ' + CONE.tw + '×' + CONE.th + '（尖 ' + CONE.tipw + '） → 总高 ' + th;
+    var ra = $('roAlign');
+    if (ra) ra.textContent = (FIRE_GAP === 0 ? '已对齐（偏移 0）' : (FIRE_GAP > 0 ? '火上抬 ' + FIRE_GAP + 'px' : '火压入筒口 ' + (-FIRE_GAP) + 'px'))
+      + ' · 火焰底边 = 火炬顶边' + (FIRE_GAP === 0 ? '' : ' ' + (FIRE_GAP > 0 ? '+' : '') + FIRE_GAP + 'px');
+    $('roInfo').textContent = '火底宽 ' + fw + ' / 筒口 ' + CONE.mw + ' = ' + Math.round(fw / CONE.mw * 100) + '%'
+      + ' · 火高 ' + fh + ' / 枪筒 ' + th + ' = ' + Math.round(fh / th * 100) + '%'
+      + ' · 锥面斜率 ' + ((CONE.tw - CONE.tipw) / 2 / CONE.th).toFixed(2);
+  }
+  function setCharMode(on) {
+    charMode = on;
+    ensureLayerBoxes();
+    if (on) { cellMem = { w: CELL_W, h: CELL_H }; setCell(CELL_H, CELL_H); }   // ★ 强制方形格
+    else { setCell(cellMem.w, cellMem.h); }
+    layerBoxes.forEach(function(b) { b.style.display = on ? 'block' : 'none'; });
+    fire.cells.forEach(function(c) { c.style.display = on ? 'none' : 'block'; });
+    for (var i = 0; i < fire.last.length; i++) fire.last[i] = -1;
+    fire._lastStr = [];
+    updateReadout();
+    drawFire();          // ★ 立刻画一帧：切模式就该马上看到字，不该等下一次 loop（测试也等不到）
+  }
+  function setCell(w, h) {
+    CELL_W = w; CELL_H = h;
+    var wrap = $('fireWrap');
+    wrap.style.gridTemplateColumns = 'repeat(' + fire.cols + ',' + CELL_W + 'px)';
+    wrap.style.gridTemplateRows = 'repeat(' + fire.rows + ',' + CELL_H + 'px)';
+    for (var i = 0; i < fire.last.length; i++) fire.last[i] = -1;   // 强制重画
+    layerBoxes.forEach(function(b) {                                // 字符层跟着格大小走
+      b.style.fontSize = CELL_W + 'px';
+      b.style.lineHeight = CELL_H + 'px';
+    });
+    fire._lastStr = [];
+    updateReadout();
+  }
+  function setFireGap(px) {
+    FIRE_GAP = Math.round(px);
+    var w = $('fireWrap');
+    w.style.setProperty('--fireGap', FIRE_GAP + 'px');   // 正数=往上抬（CSS 里 margin-bottom 正值=上移）
+    var r = $('alignRange'); if (r) r.value = FIRE_GAP;
+    updateReadout();
+  }
+  function autoFit() {
+    // 把"整支（枪筒 + 火）"缩到舞台高度里 —— 手机上尤其需要（舞台只有 40vh）
+    var st = $('stage');
+    var avail = (st && st.getBoundingClientRect ? st.getBoundingClientRect().height : 330) - 44;
+    var need = coneTotalH() + fire.rows * CELL_H + 10;
+    var s = Math.max(0.3, Math.min(1.5, avail / need));
+    setPropScale(Math.round(s * 100) / 100);
+    return s;
+  }
+  function setPropScale(s) {
+    PROP_S = s;
+    var prop = $('prop');
+    prop.style.setProperty('--s', s);
+    var r = $('scaleRange'); if (r) r.value = s;      // 滑块与按钮互相同步
+    updateReadout();
+  }
+  function loop() {
+    stepFire(); drawFire();
+    var now = Date.now();
+    fps.n++;
+    if (now - fps.t > 1000) { fps.v = Math.round(fps.n * 1000 / (now - fps.t)); fps.t = now; fps.n = 0;
+      $('stFps').textContent = fps.v + ' fps'; $('stFrames').textContent = fire.drawn; }
+  }
+
+  // 按键/手指都走同一条：按下=开火，抬手=收火
+  function setFiring(on) {
+    if (fire.firing === on) return;
+    fire.firing = on;
+    $('stage').className = on ? 'firing' : '';
+    $('inner').style.background = on ? 'rgb(255,138,43)' : '#5a3a1c';
+  }
+  // ★ 交互语义（2026-10-01 用户定稿）：**按一下 → 火焰保持 + 直接出餐**；
+  //   不是"按住才烧"（那是设计稿早期的写法，已废）。再按一下熄灭，便于反复看。
+  //   ⇒ 所以这里**故意不用 keyup**：抬手不该熄火。
+  // ★ 交互（2026-10-01 用户定稿两版合并后的最终语义）：
+  //   「按一下 → 枪筒冒火 → **出餐的就是这支冒着火的枪筒**」（它不是另一个杯子）。
+  //   一次按键 = 一次完整动作：点火 → 停顿让玩家看见"冒火的枪筒" → 整支带火飞出 → 新的回来（熄灭）。
+  //   动作期间 busy=true，再按无效 —— 免得一次动作被按成两次出餐。
+  var served = 0, busy = false, RESET_MS = 900;
+  function serveOnce() {
+    served++;
+    $('stServed').textContent = served;
+    busy = true;
+    var prop = $('prop');
+    prop.className = '';
+    void prop.offsetWidth;                 // 强制重排，好让动画能重播
+    prop.className = 'out';
+    setTimeout(function() {
+      prop.className = '';
+      setFiring(false);                    // 飞走的是这一支；回来的是一支新的（未点火）
+      busy = false;
+    }, RESET_MS);
+  }
+  function toggleFire() {
+    if (busy) return;                      // 动作进行中：忽略
+    setFiring(!fire.firing);
+    if (fire.firing) serveOnce();
+  }
+  window.addEventListener('keydown', function(e) { if (e.key === 'h' && !e.repeat) toggleFire(); });
+  // ★ 手指直接按炮筒 = 鼠标点击那条路（派发真键盘事件，与按 H 完全同源）
+  (function bindCone(){
+    var c = $('cone'); if (!c) return;
+    // ★ 手指直接点 = 鼠标点击那条路：派发真键盘事件，与按 H **完全同源**。
+    //   点一下就走 toggle（火焰保持），抬手不做任何事。
+    function tap(ev) {
+      if (ev) ev.preventDefault();
+      VKP.fire('keydown', 'h');
+      VKP.fire('keyup', 'h');        // 成对发出去，保持"真键盘"形状（游戏那边靠 keydown 触发）
+    }
+    c.addEventListener('pointerdown', tap);
+    c.addEventListener('contextmenu', function(e){ e.preventDefault(); });
+  })();
+  (function() {
+    var box = $('coneBtns'); if (!box) return;
+    CONES.forEach(function(c) {
+      var b = document.createElement('button');
+      b.className = 'vk'; b.setAttribute('data-cone', c.id);
+      b.textContent = c.label;
+      b.addEventListener('click', function() { applyCone(c.id); });
+      box.appendChild(b);
+    });
+    applyCone(CONE.id);
+  })();
+  Array.prototype.forEach.call(document.querySelectorAll('[data-shape]'), function(b) {
+    b.addEventListener('click', function() { applyShape(b.getAttribute('data-shape')); });
+  });
+  (function() {
+    var btn = $('btnChar');
+    if (!btn) return;
+    btn.addEventListener('click', function() {
+      setCharMode(!charMode);
+      btn.textContent = charMode ? '切回「方块」' : '切成「字符 █」';
+    });
+  })();
+  Array.prototype.forEach.call(document.querySelectorAll('[data-cell]'), function(b) {
+    b.addEventListener('click', function() {
+      var spec = b.getAttribute('data-cell');
+      if (spec === 'fit') {                                  // ★ 按**当前筒口宽**算，不写死 180
+        var s = CONE.mw / fire.cols;
+        setCell(s, s * 0.75);
+      } else {
+        var wh = spec.split(',');
+        setCell(parseFloat(wh[0]), parseFloat(wh[1]));
+      }
+    });
+  });
+  (function() {
+    var r = $('scaleRange');
+    if (r) r.addEventListener('input', function(e) { setPropScale(parseFloat(e.target.value)); });
+    var ar = $('alignRange');
+    if (ar) ar.addEventListener('input', function(e) { setFireGap(parseFloat(e.target.value)); });
+    var b = $('btnAutoFit');
+    if (b) b.addEventListener('click', function() { autoFit(); });
+  })();
+  Array.prototype.forEach.call(document.querySelectorAll('[data-scale]'), function(b) {
+    b.addEventListener('click', function() { setPropScale(parseFloat(b.getAttribute('data-scale'))); });
+  });
+  $('btnD16').addEventListener('click', function(){ buildFire(16, 27); });
+  $('btnD12').addEventListener('click', function(){ buildFire(12, 20); });
+  // ★ 测试缝（2026-10-01）：把火焰状态与推进函数暴露出来，
+  //   好让 tests/fire-port.mjs 能在本机驱动它并断言"三角形包络/传播/取值域"。
+  //   手机上也能在控制台直接看（window.VKFIRE.heat 等）。
+  window.VKFIRE = fire;
+  window.VKFIRE_STEP = stepFire;
+  window.VKFIRE_SET_FIRING = setFiring;
+  window.VKFIRE_BUILD = buildFire;
+  // 形状相关的缝：形状是对外承诺（"细梗长三角"是个**可断言**的几何性质，不该只靠肉眼）
+  window.VKFIRE_HALF = function(r) { return halfAt(r); };
+  window.VKFIRE_SHAPE = function() { return { cols: fire.cols, rows: fire.rows, exp: EXP, stem: STEM, bulge: BULGE }; };
+  window.VKFIRE_CHARMODE = function() { return charMode; };
+  window.VKFIRE_LAYERS = function() { return layerBoxes; };
+  window.VKFIRE_APPLY_SHAPE = applyShape;
+  window.VKCONE = function() { return { id: CONE.id, mw: CONE.mw, th: CONE.th, tipw: CONE.tipw, totalH: coneTotalH() }; };
+  window.VKCONE_APPLY = applyCone;
+  window.VKAUTOFIT = autoFit;
+  window.VKSCALE = function() { return PROP_S; };
+  window.VKALIGN = function() {
+    var w = $('fireWrap');
+    return { gap: FIRE_GAP, cssVar: (w && w.style['--fireGap']) || null };
+  };
+  window.VKGAP_APPLY = setFireGap;
+  window.VKCELL = function() {
+    var st = $('stage');
+    return { w: CELL_W, h: CELL_H, stageH: (st && st.getBoundingClientRect ? st.getBoundingClientRect().height : 330) };
+  };
+  window.VKSERVE = { served: function(){ return served; }, busy: function(){ return busy; }, resetMs: RESET_MS };
+
+  buildFire(16, 27);
+  setPropScale(PROP_S);
+  setFireGap(0);      // ★ 默认严丝合缝对齐（火的下部 ↔ 火炬上部）
+  autoFit();          // ★ 进页面即按舞台高度自适应（手机上不会一进来就顶出屏幕）
+  setInterval(loop, 50);        // 20fps：手机上也扛得住；真实帧率显示在左上角
+
+  render();
+})();
+</script>
+</body>
+</html>

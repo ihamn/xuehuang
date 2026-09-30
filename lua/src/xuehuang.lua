@@ -269,7 +269,12 @@ function OnUpdate(dt)
         end
         if not hitId and IN.hit(v, v.pack.box, 10) then hitId = 'pack' end
         if ck then
-          say('鼠标点击 (%d,%d) → 命中 %s', math.floor(ck.x), math.floor(ck.y), tostring(hitId or '空处'))
+          -- ★ ASCII 自证日志（2026-10-01）：原始光标坐标 + 换算后的画布坐标一起打。
+          --   真机上点一下左上角那张「捣锤区」卡，就能一眼判定 y 轴口径：
+          --     raw y ≈ 画布高（如 674） ⇒ y 向上为正（当前修法正确）
+          --     raw y ≈ 226             ⇒ y 向下为正（那就该回到 H/2 - y）
+          say('[CLICK] raw=(%.0f,%.0f) canvas=(%.0f,%.0f) hit=%s', ck.x, ck.y,
+              ck.x - (v.W or 0) / 2, ck.y - (v.H or 0) / 2, tostring(hitId or 'none'))
         end
         I2.clearClick()
         -- ★★ 点工位卡 = 按那个工位键（原版 doStationAction(btn,'press')）

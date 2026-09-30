@@ -11,7 +11,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
-const SIM = 'D:/miliastra-beyond-simulator';
+import { SIM_ROOT as SIM } from './sim-root.mjs';   // 模拟器位置：一处解析（云电脑/本机通用）
 const BUNDLE = path.join(ROOT, 'dist', 'xuehuang.lua');
 if (!fs.existsSync(BUNDLE)) { console.log('先合成 dist/xuehuang.lua'); process.exit(0); }
 

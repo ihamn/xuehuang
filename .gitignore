@@ -31,3 +31,7 @@ dist/*.gil.bak
 # dist/
 # preview/
 # screenshots/
+
+# ── 本机运行环境：千星沙箱模拟器（client/lua-runtime）放这儿 ──────────
+# 不是源码，是"让工具能跑"的第三方运行时；云电脑上走 D:/miliastra-beyond-simulator，不需要它
+third_party/

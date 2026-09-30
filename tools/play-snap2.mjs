@@ -14,7 +14,7 @@ const MODE = argOf('mode', 'menu');
 const SEC = Number(argOf('sec', 6));
 const W = Number(argOf('w', 1815)), H = Number(argOf('h', 900));
 const OUT = path.resolve(ROOT, argOf('out', 'preview/play.png'));
-const SIM = 'D:/miliastra-beyond-simulator';
+import { SIM_ROOT as SIM } from './sim-root.mjs';   // 模拟器位置：一处解析（云电脑/本机通用）
 
 const { createRuntime, unpackRgba } = await import(pathToFileURL(path.join(SIM, 'client/lua-runtime/src/index.js')).href);
 const rt = createRuntime({ canvasWidth: W, canvasHeight: H });

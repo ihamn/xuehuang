@@ -17,7 +17,7 @@ const W = Number(argOf('w', 1280)), H = Number(argOf('h', 720));
 const SECONDS = Number(argOf('seconds', 30));
 const OUT = path.resolve(ROOT, argOf('out', 'preview/view.png'));
 const BUNDLE = path.resolve(ROOT, argOf('bundle', 'dist/xuehuang.lua'));
-const SIM = 'D:/miliastra-beyond-simulator';
+import { SIM_ROOT as SIM } from './sim-root.mjs';   // 模拟器位置：一处解析（云电脑/本机通用）
 const ENTRY = path.join(SIM, 'client/lua-runtime/src/index.js');
 if (!fs.existsSync(ENTRY) || !fs.existsSync(BUNDLE)) { console.log('跳过：缺模拟器或产物'); process.exit(0); }
 

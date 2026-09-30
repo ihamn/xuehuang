@@ -11,11 +11,12 @@
 //   node tools/sim-run.mjs lua/src/hello.lua                  # 跑 90 帧，打印日志 + 控件统计
 //   node tools/sim-run.mjs lua/src/hello.lua --frames=600 --json=dist/tree.json
 //
-// 模拟器在哪：默认找 D:/miliastra-beyond-simulator（可用 XUEHUANG_SIM 覆盖）。找不到就退出码 0 跳过。
+// 模拟器在哪：见 tools/sim-root.mjs（XUEHUANG_SIM → 仓内 third_party/beyond-sim → D:/miliastra-beyond-simulator）。找不到就退出码 0 跳过。
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { SIM_ENTRY, SIM_FOUND, reportMissingSim } from './sim-root.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const argOf = (name, dflt) => {
@@ -26,17 +27,9 @@ const argOf = (name, dflt) => {
 };
 const scriptArg = process.argv.slice(2).find(a => !a.startsWith('--'));
 
-const SIM_CANDIDATES = [
-  process.env.XUEHUANG_SIM,
-  'D:/miliastra-beyond-simulator',
-  path.resolve(ROOT, '..', 'miliastra-beyond-simulator'),
-].filter(Boolean);
-const ENTRY = SIM_CANDIDATES
-  .map(d => path.join(d, 'client', 'lua-runtime', 'src', 'index.js'))
-  .find(p => fs.existsSync(p));
-if (!ENTRY) {
-  console.log('试玩台：跳过（没找到模拟器 client/lua-runtime/src/index.js）');
-  console.log('  找过：\n    ' + SIM_CANDIDATES.join('\n    '));
+const ENTRY = SIM_ENTRY;
+if (!SIM_FOUND) {
+  reportMissingSim('试玩台');
   process.exit(0);
 }
 

@@ -10,7 +10,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
-const SIM = 'D:/miliastra-beyond-simulator/client/lua-runtime/node_modules/fengari/src/fengari.js';
+import { SIM_FENGARI as SIM } from './sim-root.mjs';   // 模拟器位置：一处解析（云电脑/本机通用）
 if (!fs.existsSync(SIM)) { console.log('跳过：没找到 fengari'); process.exit(0); }
 const fengari = (await import(pathToFileURL(SIM).href)).default;
 

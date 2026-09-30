@@ -347,14 +347,20 @@ end
 
 -- ══════════════════════════════════════════════════════════════════════════
 -- 命中测试（鼠标点工位卡）
---   实测：GetCursorUIPos 的 y 向下为正；控件 anchoredPosition 的 y 向上为正
---   ⇒ cy 用 H/2 - clicked.y 翻转方向
+-- ★★ y 轴口径（2026-10-01 修正，别再翻回去）：
+--   官方光标 API（GetCursorUIPos）与控件 anchoredPosition 是**同一套口径**：
+--   画布左下角为原点、y 向上为正（见 奇域实战经验-交接手册.md 的「光标坐标」一条）。
+--   ⇒ 两者之间只需**平移到画布中心**，不要再翻符号。
+--   ⚠️ 这里原写的是「实测 y 向下为正 ⇒ 用 H/2 - y 翻转」，那一版把 y 镜像了：
+--     上面一排（y≈+224）两张卡的点会落到打包台（y≈-204）上，打包台的点又落到上面一排；
+--     中间一排 y=0 的两张镜像后不变 ⇒ 一直"看着能用"，只有上面一排和打包台是坏的。
+--     （2026-10-01 用户真机报的正是「捣锤/火系点不动、还正好跑到打包台」）
 -- ══════════════════════════════════════════════════════════════════════════
 function IN.hit(v, ctrl, pad)
   if not IN.clicked or not ctrl or not v then return false end
   pad = pad or 0
   local cx = IN.clicked.x - (v.W or 0) / 2
-  local cy = (v.H or 0) / 2 - IN.clicked.y
+  local cy = IN.clicked.y - (v.H or 0) / 2
   local ok, x, y, w, h = pcall(function()
     return ctrl.anchoredPositionX, ctrl.anchoredPositionY, ctrl.sizeDeltaX, ctrl.sizeDeltaY
   end)

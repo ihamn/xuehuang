@@ -34,22 +34,42 @@ P.spec = {
     shineW   = 4,           -- 高光宽
   },
   cone = {
-    w        = 160, h = 182,  -- 锥体（三角）顶宽 / 高
-    mouthH   = 20,            -- 筒口高
-    mouthW   = 180,           -- 筒口宽（比锥顶宽，形成"沿"）
-    gripH    = 26,            -- 握把高
-    gripW    = 140,           -- 握把宽
-    tipW     = 10,            -- 锥尖宽（不是 0，免得看不见）→ 决定"盖住多少"
+    -- ★ 2026-10-01 用户在网页原型上圈定（预设"火炬·细高"）：
+    --   造型要求"更细、更陡、整体更小"，且整支点着后要像**火炬**（见 qilin 注释第 ⑤ 层）。
+    --   锥面收进量 (w - tipW)/2/h = (104-6)/2/214 ≈ 0.229（旧炮管是 0.467，明显更"喇叭"）。
+    w        = 104, h = 214,  -- 锥体（三角）顶宽 / 高
+    mouthH   = 18,            -- 筒口高
+    mouthW   = 120,           -- 筒口宽（比锥顶宽，形成"沿"）
+    gripH    = 34,            -- 握把高
+    gripW    = 84,            -- 握把宽
+    tipW     = 6,             -- 锥尖宽（不是 0，免得看不见）→ 决定"盖住多少"
     maskTint = { 10, 14, 24 },-- 遮挡块颜色（≈画布底色；盖块靠"同色"假装不存在）
   },
   fire = {
     cols = 16, rows = 27,     -- 网格（用户选定）
-    cellW = 4, cellH = 3,     -- 每格设计像素 → 显示 64×81（比例同 12:20）
+    -- ★ 每格尺寸**不在这里写死**（2026-10-01 用户圈定）：格宽 = 筒口宽 / 列数，
+    --   即"火的下部与火炬上部对齐、且火底宽正好等于筒口宽"。
+    --   两个数分开写就会漂移（网页上圈的是 7.5×5.625 = 120/16 × 0.75），所以只留关系、不留数。
+    aspect = 0.75,            -- 每格高 / 宽（4:3；字形不能单独拉伸，所以这是硬比例）
     sourceRows = 3,           -- 底部几行是火源
     decayMax = 3,             -- 每帧最大衰减
     exponent = 0.9,           -- 三角包络指数（越大越瘦）
   },
 }
+
+-- ★ 由"筒口宽"推出火焰格尺寸（唯一真相在这条式子里）
+function P.fireCellW() return P.spec.cone.mouthW / P.spec.fire.cols end
+function P.fireCellH() return P.fireCellW() * P.spec.fire.aspect end
+function P.fireSize() return P.spec.fire.cols * P.fireCellW(), P.spec.fire.rows * P.fireCellH() end
+
+-- ★ 对齐（2026-10-01 用户圈定）：火的**底边**要正好落在**筒口顶边**上。
+--   传 P.cone 的返回值 + 火的根控件，返回"火根中心该放的 y"（画布坐标）。
+--   为什么给函数而不是让调用者自己算：一共三个量（scale / mouthTopY / 火高），漏乘一个就错位。
+function P.fireY(cone, fireRootH)
+  local sc = cone.scale or 1
+  return (cone.rootY or 0) + (cone.mouthTopY or 0) * sc + (fireRootH or 0) / 2
+end
+
 
 -- 25 级调色板：冷 → 热（DOOM 那套），带 A 通道做"火梢渐隐"
 P.PAL = {
@@ -220,7 +240,15 @@ end
 
 -- ══════════════════════════════════════════════════════════
 -- 五、炮筒：锥体 = **一个三角形（转 180°）**，尖头收钝只用一个不大的盖块
---
+
+--   ★ 它**既是枪筒，也是甜筒**（cone 的双关；见 雪皇的后厨.html 里 qilin 那条注释）：
+--     ★ 出餐交付的就是**这支冒火的枪筒本身**（枪筒=甜筒=这道产品；不是另装一杯）。
+--     ★★ 造型还要往**火炬**靠（2026-10-01 用户明确）：更细、更陡、整体更小，别做成粗短炮管。
+--        "火炬"不只是形容，它自己又开了一串 neta：现实里的火炬冰淇淋 / 奥运火炬传递 /
+--        《火炬之光》Torchwood 之类 —— 详见 雪皇的后厨.html 里 qilin 注释的第 ⑤ 条。
+--        ⚠️ 具体尺寸待用户从 preview/手机按键-微量测试.html 第 ③-b 节的 4 档里圈定后写回 P.spec.cone。--       演出：枪筒冒火 → 整支带火递给客人（serveNow，一步到位，没有打包台）。--     产品「白芝麻火麒麟」同时恶搞冰淇淋（黑芝麻冰麒麟）与 neta 名枪（火麒麟），
+--     所以这道工序是"掏出枪筒 → 用喷火枪烤"，做完直出（serveNow）。
+--     画它的时候别只画成"一根枪管"：它同时是那支要被烤的甜筒。--
 -- ★ 三角朝向（实测，见 preview/design/prims.png）：
 --   三角形图元**顶点在上、底边在下**；转 180° 才是尖朝下。
 -- ★ 这一版和"12 层叠条"的区别：控件 12 → 2，边缘是真三角形（不是台阶）。
@@ -230,6 +258,20 @@ end
 --     三角总高 Htri = h / (1 - tipW/w)   ← 注意分母是 1 减去"宽度比"，不是宽度比本身
 --   （我上一版把公式写成 h × w/tipW，直接把三角放大 16 倍 —— 那才是"一根竖条"的原因。）
 -- ══════════════════════════════════════════════════════════
+-- ★ 等比缩放（2026-10-01）：把"已经建好的零件"统一乘一个比例。
+--   为什么不把比例乘进规格数字：P.spec 是与 preview/design/*.html **对齐的唯一真相**，
+--   乘进去以后就再也对不上设计稿了。缩放只发生在"落地那一刻"。
+function P.scaleParts(controls, sc)
+  for _, ctl in ipairs(controls) do
+    pcall(function()
+      local x, y = ctl.anchoredPositionX or 0, ctl.anchoredPositionY or 0
+      local w, h = ctl.sizeDeltaX or 0, ctl.sizeDeltaY or 0
+      H.setPos(ctl, x * sc, y * sc)
+      H.setSize(ctl, w * sc, h * sc)
+    end)
+  end
+end
+
 function P.cone(cfg, name, x, y, opts)
   opts = opts or {}
   local c = P.spec.cone
@@ -266,7 +308,10 @@ function P.cone(cfg, name, x, y, opts)
   H.setSize(mask, c.w + 20, mH)
   -- 三角转 180° 后实际尖点比 sizeDeltaY/2 多伸一小段（图元自带留白），所以顶边上抬 24
   H.setPos(mask, 0, coneBot + 24 - mH / 2)
-  H.setColor(mask, c.maskTint[1], c.maskTint[2], c.maskTint[3], 255)
+  -- ★ 遮挡块颜色（opts.maskColor）：默认是画布底色；**落在彩色卡片上时必须传卡片色**，
+  --   否则"假装不存在"的遮挡块会显出一块深色方块（放在卡片上的第一眼瑕疵就是这个）。
+  local mc = opts.maskColor or c.maskTint
+  H.setColor(mask, mc[1], mc[2], mc[3], mc[4] or 255)
 
   -- ② 锥体（后画）：三角形转 180°，**底边对齐锥顶** ⇒ 中心 = coneTop − Htri/2
   local cfgTri = { root = root, img = cfg.img, text = cfg.text, art = art }
@@ -300,8 +345,16 @@ function P.cone(cfg, name, x, y, opts)
   H.setColor(shine, 255, 255, 255, 90)
   H.setPos(shine, -c.w * 0.22, coneTop - c.h * 0.42)
 
+  -- ★ 等比缩放：opts.scale 直接给比例，或 opts.fitH 给"目标总高"（界面里更常用）
+  local sc = opts.scale or (opts.fitH and (opts.fitH / rootH)) or 1
+  if sc ~= 1 then
+    H.setSize(root, c.mouthW * sc, rootH * sc)
+    P.scaleParts({ mask, tri, grip, mouth, inner, shine }, sc)
+  end
+
   return { root = root, mouth = mouth, inner = inner, grip = grip, shine = shine,
-           tri = tri, mask = mask, mouthW = c.mouthW, mouthTopY = mouthTop }
+           tri = tri, mask = mask, mouthW = c.mouthW, mouthTopY = mouthTop,
+           nativeW = c.mouthW, nativeH = rootH, scale = sc, rootY = y or 0 }
 end
 
 -- ══════════════════════════════════════════════════════════
@@ -314,7 +367,8 @@ function P.fire(cfg, name, x, y, opts)
   local s = P.spec.fire
   local cols, rows = s.cols, s.rows
   local root = H.spawn(cfg, 'img', name or 'FireRoot')
-  H.setSize(root, cols * s.cellW, rows * s.cellH)
+  local cw, ch = P.fireCellW(), P.fireCellH()      -- ★ 由筒口宽推导（见 P.fireCellW）
+  H.setSize(root, cols * cw, rows * ch)
   H.setPos(root, x or 0, y or 0)
   H.setColor(root, 0, 0, 0, 0)                  -- 容器透明
 
@@ -323,11 +377,11 @@ function P.fire(cfg, name, x, y, opts)
   for r = 1, rows do
     for c = 1, cols do
       local cell = H.spawn(cfg, 'img', 'Fx' .. r .. '_' .. c, root)
-      H.setSize(cell, s.cellW, s.cellH)
+      H.setSize(cell, cw, ch)
       -- 坐标：以容器中心为原点（左下角第一格）
       H.setPos(cell,
-        (c - 0.5) * s.cellW - cols * s.cellW / 2,
-        (rows - r + 0.5) * s.cellH - rows * s.cellH / 2)
+        (c - 0.5) * cw - cols * cw / 2,
+        (rows - r + 0.5) * ch - rows * ch / 2)
       H.setColor(cell, 0, 0, 0, 0)
       cells[r * cols + c] = cell
     end
@@ -393,11 +447,43 @@ function P.fire(cfg, name, x, y, opts)
     end
   end
 
+  -- ★ 等比缩放（opts.scale）：与 P.cone 用**同一个 scale** 才能保持"火宽 = 筒口宽"。
+  --   注意是 432 个格子，只在这里跑一次（运行期不再动尺寸）。
+  local sc = opts.scale or 1
+  if sc ~= 1 then
+    H.setSize(root, cols * cw * sc, rows * ch * sc)
+    P.scaleParts(cells, sc)
+  end
+
   drawFire()
   return {
     root = root, cells = cells, heat = heat,
     step = stepFire, draw = drawFire,
     cols = cols, rows = rows, blockCount = cols * rows,
+    scale = sc, w = cols * cw * sc, h = rows * ch * sc,
+  }
+end
+
+-- ══════════════════════════════════════════════════════════
+-- 七、★ 一次把"火炬 + 火"建好并**对齐**（推荐入口）
+--   用户 2026-10-01 圈定的关系：**火的下部与火炬上部对齐**（火底边 = 筒口顶边），
+--   且 **火宽 = 筒口宽**（同一 scale 下自然成立）。
+--   为什么不把这三件事留给调用者：要乘的 scale 有三个地方（筒口顶边 / 火高 / 火宽），
+--   漏乘一个就错位，而且错位了"看起来只是有点歪"，很难查 —— 所以收成一个入口。
+--   返回 { cone=…, fire=…, scale=…, mouthTopY=…, fireBottomY=… }，便于断言与调试。
+function P.torchWithFire(cfg, name, x, y, opts)
+  opts = opts or {}
+  local sc = opts.scale or 1
+  name = name or 'Torch'
+  local cone = P.cone(cfg, name .. 'Torch', x, y, opts)
+  local fireH = P.spec.fire.rows * P.fireCellH() * sc
+  local fireY = P.fireY(cone, fireH)                       -- 火根中心 y（底边贴筒口顶边）
+  local fire = P.fire(cfg, name .. 'Fire', x, fireY, { scale = sc })
+  return {
+    cone = cone, fire = fire, scale = sc,
+    mouthTopY = (y or 0) + (cone.mouthTopY or 0) * sc,
+    fireBottomY = fireY - fireH / 2,
+    fireH = fireH,
   }
 end
 

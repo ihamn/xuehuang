@@ -18,7 +18,7 @@ const argOf = (n, d) => { const h = process.argv.find(a => a.startsWith('--' + n
 const W = Number(argOf('w', 1280)), H = Number(argOf('h', 720));
 const SECONDS = Number(argOf('seconds', 10));
 const BUNDLE = path.resolve(ROOT, argOf('bundle', 'dist/xuehuang.lua'));
-const SIM = 'D:/miliastra-beyond-simulator';
+import { SIM_ROOT as SIM } from './sim-root.mjs';   // 模拟器位置：一处解析（云电脑/本机通用）
 const { createRuntime, walkControls } = await import(pathToFileURL(path.join(SIM, 'client/lua-runtime/src/index.js')).href);
 
 const rt = createRuntime({ canvasWidth: W, canvasHeight: H });

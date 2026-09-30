@@ -22,6 +22,7 @@
 --   · 文字只用中文/ASCII（原神没 emoji 字体 → 豆腐块；tools/font-audit.mjs 会拦）
 
 local H = require('host')
+local P = require('props')   -- 实物视觉件（杯子/炮筒/火）
 local STATE = require('state')
 local CFG = require('config')
 local SK = require('skin')
@@ -238,6 +239,20 @@ function V.init(hostCfg)
       name = name, key = key, keyT = keyT, icon = icon, step = step, bar = bar,
       barW = lay.barW,
     }
+
+    -- ★ 实物化试水（2026-10-01）：火系区先挂一个**炮筒**实物件。
+    --   归属/位置用户说"之后再说"，所以这里只做两件事：能显示、能跟着玩区显隐。
+    if st.id == 'fire' then
+      local okC, cone = pcall(P.cone, hostCfg, 'FireCone', lay.iconX, lay.iconY, { fitH = T.size.iconBig, maskColor = col })
+      if okC and cone then
+        local slot = v.stations[st.id]
+        for _, c in ipairs({ cone.root, cone.mask, cone.tri, cone.grip, cone.mouth, cone.inner, cone.shine }) do
+          slot.controls[#slot.controls + 1] = c
+        end
+        slot.cone = cone
+        slot.coneScale = cone.scale
+      end
+    end
   end
 
   -- ═══ 3. 打包台 ═══

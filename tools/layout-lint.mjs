@@ -22,7 +22,7 @@ const ROOT = path.resolve(import.meta.dirname, '..');
 const argOf = (n, d) => { const h = process.argv.find(a => a.startsWith('--' + n + '=')); return h ? h.slice(n.length + 3) : d; };
 const W = Number(argOf('w', 1815)), H = Number(argOf('h', 900));
 const BUNDLE = path.join(ROOT, 'dist', 'xuehuang.lua');
-const SIM = 'D:/miliastra-beyond-simulator';
+import { SIM_ROOT as SIM } from './sim-root.mjs';   // 模拟器位置：一处解析（云电脑/本机通用）
 
 if (!fs.existsSync(BUNDLE)) { console.log('先合成 dist/xuehuang.lua'); process.exit(0); }
 const { createRuntime, unpackRgba } = await import(pathToFileURL(path.join(SIM, 'client/lua-runtime/src/index.js')).href);

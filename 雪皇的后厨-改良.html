@@ -1,9 +1,22 @@
 <!DOCTYPE html>
+<!--
+  ⚠️ 这是**改良版副本**（2026-10-01 新建），基于《雪皇的后厨》网页原版。
+
+  规矩（与仓库其它地方一致）：
+    · `雪皇的后厨.html`（原版）= **还原度基准**，一个字都不要改；改良都在本文件做。
+    · 本文件里的每一处改良，都要能在移植侧找到对应物（lua/src/*.lua），
+      否则就变成"网页能看、千星做不出来"的空中楼阁。
+    · 改完记得把"这次改了什么"写进文件末尾的【改良记录】区，方便移植时对照。
+
+  【改良记录】
+    · 改-0001（2026-10-01）新建副本；仅改标题与加本注释，画面与逻辑与原版逐字节一致。
+-->
+
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>雪皇的后厨 · 荒诞饮品模拟器</title>
+<title>雪皇的后厨 · 荒诞饮品模拟器（改良 v1）</title>
 <style>
 :root{
   --bg:#0e1016; --bg2:#141824; --panel:#1a2030; --panel2:#212a3d;
@@ -2199,5 +2212,7 @@ if(typeof location === 'object' && /[?&]auto=1/.test(location.search || '')) aut
 /* 只有真的有动画帧才开主循环（无头冒烟测试里由测试自己推 tick） */
 if(typeof requestAnimationFrame === 'function'){ rafOn = true; requestAnimationFrame(t => { lastT = t; requestAnimationFrame(frame); }); }
 </script>
+
+<!-- =================【改良记录】区（写在这里）================= -->
 </body>
 </html>
