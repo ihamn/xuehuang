@@ -170,7 +170,8 @@ function D.settle(s)
   end
   local rec = { day = s.day, served = s.today.served, money = s.today.money,
                 left = s.today.left, mistakes = s.today.mistakes,
-                rent = rent, paid = paid, debt = s.rentDebt }
+                rent = rent, paid = paid, debt = s.rentDebt,
+                eco = s.today.eco }   -- ★ 当日环保凭证（结算页显示；收摊时按天累加）
   s.dayStats[#s.dayStats + 1] = rec
   s.log[#s.log + 1] = string.format('第 %d 天：出餐 %d 杯 / 营业额 %d / 流失 %d / 翻车 %d → 房租 %d %s',
     rec.day, rec.served, rec.money, rec.left, rec.mistakes, rent, paid and '已付' or ('欠缴(累计 ' .. s.rentDebt .. ')'))
@@ -188,7 +189,8 @@ function D.nextDay(s)
   s.phase = 'open'
   s.day = s.day + 1
   s.dayLeft = s.mode.perDay
-  s.today = { served = 0, money = 0, left = 0, mistakes = 0 }
+  s.today = { served = 0, money = 0, left = 0, mistakes = 0,
+              eco = { fixed = 0, zwd = 0 } }   -- ★ 每天归零，否则凭证会一路累加
   s.nextArrive = CFG.arrive.first
   return s.day
 end

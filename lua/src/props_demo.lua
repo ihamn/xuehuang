@@ -32,14 +32,17 @@ function OnStart()
   local cfg = { root = root, img = 1, text = 2 }
 
   -- 三件排开（画布 1280×720，原点在中心）
-  cup  = P.cup(cfg, 'Cup', -420, 60, P.drink.brom)       -- 溴水（黄褐）
+  cup  = P.cup(cfg, 'Cup', -420, 60, P.drink.brom, { maskColor = P.spec.MASK_CANVAS })  -- 溴水（黄褐）
+  -- ★ 2026-10-01：干冰（真堆叠冰堆 + 下沉白雾 + 结霜）+ 柠檬锤，一起摆出来看
+  ice  = P.dryice(cfg, 'Ice', cup.root, { scale = 1 })
+  ham  = P.lemonHammer(cfg, 'Ham', 420, 40, { scale = 1 })
   cone = P.cone(cfg, 'Cone',  0, 110, { lit = true })    -- 炮筒（点火状态）
   fire = P.fire(cfg, 'Fire',  420, -20)                  -- 火：16×27 = 432 格
 
   -- 液面演示：同一个杯子摆四份不同进度，验证"液面是平的"
   local demo = { 0.0, 0.25, 0.62, 1.0 }
   for i = 1, #demo do
-    local c = P.cup(cfg, 'CupFill' .. i, -600 + (i - 1) * 96, -230, P.drink.water)
+    local c = P.cup(cfg, 'CupFill' .. i, -600 + (i - 1) * 96, -230, P.drink.water, { maskColor = P.spec.MASK_CANVAS })
     c.setFill(demo[i])
   end
   cup.setFill(0.62)

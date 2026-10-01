@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>杯子 · 轻量化原型</title>
+<style>
+  :root{ --bg:#0e1016; --panel:#1a2030; --line:#2c364d; --ink:#e9eefb; --dim:#8e9bb5; --ok:#5fe08a; --gold:#ffcf6b; }
+  *{box-sizing:border-box} html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,"PingFang SC",sans-serif;padding:10px 10px 16px;user-select:none;-webkit-user-select:none}
+  h1{font-size:16px;margin:4px 0 2px}
+  .hint{color:var(--dim);font-size:12px;margin:0 0 10px;line-height:1.6}
+  section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:10px}
+  section h2{font-size:13px;margin:0 0 8px;color:var(--gold)}
+  .row{display:flex;justify-content:space-between;gap:8px;padding:3px 0;font-size:13px;font-variant-numeric:tabular-nums}
+  .row b{color:#fff}
+  .grid{display:grid;gap:6px}
+  .g3{grid-template-columns:repeat(3,1fr)} .g4{grid-template-columns:repeat(4,1fr)} .g6{grid-template-columns:repeat(6,1fr)}
+  button.vk{appearance:none;border:1px solid #3a4560;background:#222b3f;color:var(--ink);border-radius:10px;padding:10px 4px;font:600 12px/1.2 system-ui;touch-action:manipulation;min-height:42px}
+  button.vk:active,button.vk.on{background:#3a7bd5;border-color:#6ea8ff}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:34px;background:transparent;margin:2px 0}
+  input[type=range]::-webkit-slider-runnable-track{height:8px;border-radius:4px;background:#2b3550}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:28px;height:28px;margin-top:-10px;border-radius:50%;background:#6ea8ff;border:2px solid #cfe1ff}
+  #stage{background:#0b0e15;   /* ★ 默认纯色：遮挡块是纯色块，渐变背景永远对不上 */
+         position:relative;height:clamp(260px,46dvh,420px);   /* dvh：把手机浏览器底栏算进去 */border-radius:12px;border:1px solid var(--line);
+         overflow:hidden;margin-bottom:10px}
+  #hud{position:absolute;left:10px;top:8px;font-size:12px;color:var(--dim);line-height:1.75}
+  #hud b{color:#fff}
+  /* ★ 位置修复（2026-10-01）：原来 #cup 是 0×0，于是"容器底边"= 杯子中心
+     → 整支杯子沉到舞台底板下面去了。给根一个真实尺寸（口径 × 杯高），
+     子件再以根中心为原点摆（与 props.lua 的"相对根控件中心"一致）。 */
+  #cupWrap{position:absolute;left:50%;bottom:var(--cy,34px);transform:translateX(-50%) scale(var(--s,2));transform-origin:50% 100%}
+  #cup{position:relative;width:100px;height:100px}
+  #cup > div{position:absolute;left:50%;top:50%}
+  /* 三角形图元：上沿平、下收成尖（对应千星里"三角形转 180°"） */
+  .tri{clip-path:polygon(0 0,100% 0,50% 100%)}
+  .mask{background:var(--mask,#0b0e15)}
+  .bodyB{background:rgba(224,240,255,.31)}
+  .liqB{background:rgba(143,208,255,.94)}
+  #liqTop{background:rgba(255,255,255,.5)}
+  #lip{background:#eaf3ff}
+  /* ★ 杯底亮边（2026-10-01 用户报"没做成"）：它原来是个**没有任何样式**的 div ——
+     CSS 里只有 #lip/#shine 的规则，没有 #base ⇒ 建出来了但完全透明，等于没做。
+     教训：新建一个视觉件时，**"给它颜色"和"给它位置"是两件事**，漏一件就是"看不见"。 */
+  /* ★ 不透明（2026-10-01 用户："半透明效果不好"）：半透明压在玻璃+液体上会糊成一片，
+     杯口亮边本来就是实色 #eaf3ff，杯底沿用同一族、暗一档即可。 */
+  #base{background:#cfe0f5;border-radius:1px}
+  #shine{background:rgba(255,255,255,.5)}
+  .ice{background:rgba(235,248,255,.85);border-radius:2px}
+  .lemon{background:#f2e27a;border-radius:50%;box-shadow:inset 0 0 0 3px #fff4b0}
+  #fog{background:linear-gradient(180deg,rgba(235,245,255,.34),rgba(235,245,255,0));border-radius:8px}
+  /* ── 内容件（杯子里放什么）── */
+  .cube{background:rgba(238,250,255,.9);border-radius:2px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.6)}
+  .lemonS{background:#f2e27a;border-radius:50%;box-shadow:inset 0 0 0 3px #fff4b0}
+  .chunk{background:#f0994f;border-radius:3px}
+  .chunkAp{background:#cfe08a;border-radius:3px}
+  .bub{background:rgba(255,255,255,.55);border-radius:50%}
+  .foam{background:rgba(255,255,255,.42);border-radius:3px}
+  .steam{background:linear-gradient(180deg,rgba(255,255,255,.30),rgba(255,255,255,0));border-radius:10px}
+  #rim{background:#8a5a2b;border-radius:3px}
+  #lid{background:#dfe9f7;border-radius:6px}
+  #dryiceFog{background:linear-gradient(180deg,rgba(255,255,255,.5),rgba(255,255,255,0));border-radius:12px}
+  /* ── 一次性动效：每次命中都放一下（玩家靠它确认"这一下有效"）── */
+  @keyframes pShake{0%,100%{transform:translateX(-50%) scale(var(--s,2))}25%{transform:translateX(calc(-50% - 5px)) scale(var(--s,2))}75%{transform:translateX(calc(-50% + 5px)) scale(var(--s,2))}}
+  @keyframes pRipple{0%,100%{filter:none}50%{filter:brightness(1.25)}}
+  @keyframes pSplash{0%{filter:brightness(1)}40%{filter:brightness(1.5)}100%{filter:brightness(1)}}
+  @keyframes pFlash{0%,100%{filter:none}30%{filter:brightness(1.6) saturate(1.4)}}
+  #cupWrap.pulse-shake{animation:pShake .24s ease-in-out 1}
+  #cupWrap.pulse-ripple #cup{animation:pRipple .24s ease-in-out 1}
+  #cupWrap.pulse-splash #cup{animation:pSplash .22s ease-out 1}
+  #cupWrap.pulse-shuffle #cup{animation:pShake .22s ease-in-out 1}
+  #cupWrap.pulse-flash #cup{animation:pFlash .24s ease-out 1}
+</style>
+</head>
+<body>
+<h1>杯子 · 轻量化原型</h1>
+<p class="hint">与 <b>lua/src/props.lua 的 P.cup 同一套数学</b>；<b>两种实现可切换</b>（三角形+遮挡 7 控件 / 叠条 52 控件）：杯身 32 条按 <b>halfOuter</b> 逐行插值、液体 16 条按 <b>halfInner</b>（贴内壁，不是内接梯形）、液面一条水平亮线。<br>
+读数里的<b>控件数必须是 52</b>（32 杯身 + 16 液体 + 1 亮线 + 杯口 + 高光 + 根）——因为这个数是真机预算里的钱。</p>
+
+<section id="stage">
+  <button class="vk" id="btnFlat" style="position:absolute;right:10px;top:8px;min-height:30px;padding:4px 10px;font-size:12px;z-index:5">背景改纯色</button>
+  <div id="hud">
+    控件 <b id="roCount">—</b> · 口径 <b id="roMouth">—</b> · 底径 <b id="roBase">—</b> · 杯高 <b id="roH">—</b><br>
+    斜率 <b id="roSlope">—</b> · 液面 <b id="roFill">—</b> · 液面 y <b id="roFillY">—</b><br>
+    缩放 <b id="roScale">—</b> · 配料 <b id="roTop">—</b><br>
+    台词 <b id="roQuip">—</b>
+  </div>
+  <div id="cupWrap"><div id="cup"></div></div>
+</section>
+
+<section id="player">
+  <h2>⑦ 工序播放器（按一下 = 玩家做一次操作）</h2>
+  <div class="grid g3" id="prodBtns"></div>
+  <div class="row" style="margin-top:8px"><span>当前步骤</span><b id="roStep">—</b></div>
+  <div class="row"><span>进度</span><b id="roHits">—</b></div>
+  <div class="row"><span>液体</span><b id="roLiq">—</b></div>
+  <div class="row"><span>内容</span><b id="roCont">—</b></div>
+  <div class="grid" style="grid-template-columns:2fr 1fr;margin-top:6px">
+    <button class="vk" id="btnAct" style="min-height:52px;font-size:16px">按一下（做这一步）</button>
+    <button class="vk" id="btnReset">重播</button>
+  </div>
+  <div class="row" style="margin-top:6px"><span>说明</span><span style="font-size:11px;color:var(--dim);text-align:right">
+    连按步（mash）要按满次数：液面在次数里**均分**涨上去<br>器具步（咖啡前三步）杯子不动 —— 这就是&quot;按了没反应&quot;要避免的</span></div>
+</section>
+
+<section>
+  <h2>① 形状（设计稿上挂着"⏳ 等你圈：斜率够不够大"）</h2>
+  <div class="row"><span>口径</span><b id="lbMouth">100</b></div>
+  <input type="range" id="rMouth" min="60" max="160" step="1" value="100">
+  <div class="row"><span>底径</span><b id="lbBase">69.2</b></div>
+  <input type="range" id="rBase" min="20" max="160" step="0.5" value="69.2">
+  <div class="row"><span>杯高</span><b id="lbH">100</b></div>
+  <input type="range" id="rH" min="60" max="200" step="1" value="100">
+  <div class="grid g3" style="margin-top:6px">
+    <button class="vk" data-shape="now">现状 8.75°</button>
+    <button class="vk" data-shape="steep">更陡 ≈15°</button>
+    <button class="vk" data-shape="straight">更直 ≈5°</button>
+  </div>
+</section>
+
+<section>
+  <h2>①-b 实现方式（这是控件预算的开关）</h2>
+  <div class="grid g2" style="grid-template-columns:repeat(2,1fr)">
+    <button class="vk" data-mode="tri">三角形 + 遮挡（7 控件）</button>
+    <button class="vk" data-mode="band">叠条（52 控件）</button>
+  </div>
+  <div class="row" style="margin-top:6px"><span>说明</span><span style="font-size:11px;color:var(--dim);text-align:right">
+    两种模式必须**看起来一样**（测试会比对轮廓逐点一致）<br>遮挡块颜色 = 背景色（放在卡片上要改成卡片色）</span></div>
+</section>
+
+<section>
+  <h2>② 液面（= 玩法进度）</h2>
+  <input type="range" id="rFill" min="0" max="100" step="1" value="62">
+  <div class="grid g6" style="margin-top:2px">
+    <button class="vk" data-fill="0">空</button>
+    <button class="vk" data-fill="62">62%</button>
+    <button class="vk" data-fill="74">74%</button>
+    <button class="vk" data-fill="84">84%</button>
+    <button class="vk" data-fill="88">88%</button>
+    <button class="vk" data-fill="100">满</button>
+  </div>
+</section>
+
+<section>
+  <h2>③ 饮料（六种真色，来自 P.drink）</h2>
+  <div class="grid g6" id="drinkBtns"></div>
+</section>
+
+<section>
+  <h2>④ 配料（设计稿另一条 ⏳："要不要冰块柠檬片"）</h2>
+  <div class="grid g3">
+    <button class="vk" data-top="ice">冰块</button>
+    <button class="vk" data-top="lemon">柠檬片</button>
+    <button class="vk" data-top="fog">干冰白雾</button>
+  </div>
+  <div class="row" style="margin-top:6px"><span>说明</span><span style="font-size:11px;color:var(--dim);text-align:right">
+    配料是**加在杯里的子件**，不改杯身几何<br>（测试会盯这一条）</span></div>
+</section>
+
+<section>
+  <h2>⑤ 背景 / 遮挡色（真机上这两者必须一致）</h2>
+  <div class="grid" style="grid-template-columns:repeat(3,1fr)">
+    <button class="vk" data-bg="#0b0e15">画布底色</button>
+    <button class="vk" data-bg="#1a2030">面板色</button>
+    <button class="vk" data-bg="#ff9a4d">卡片橙（举例）</button>
+  </div>
+  <div class="row" style="margin-top:6px"><span>遮挡块上沿</span><b id="roMask">—</b></div>
+  <div class="grid" style="grid-template-columns:repeat(2,1fr);margin-top:6px">
+    <button class="vk" data-opt="baseline">杯底亮边（可选）</button>
+    <button class="vk" data-opt="flat">背景渐变（看露馅）</button>
+  </div>
+  <div class="row" style="margin-top:6px"><span>说明</span><span style="font-size:11px;color:var(--dim);text-align:right">
+    平台硬限制：父控件不裁子控件 ⇒ 只能同色遮挡<br>所以杯子放哪，遮挡块就得用**那里的颜色**</span></div>
+</section>
+
+<section>
+  <h2>⑥ 大小（手机上拖动横条）</h2>
+  <input type="range" id="rScale" min="0.8" max="4" step="0.05" value="2">
+  <div class="row" style="margin-top:6px"><span>上下位置（被下方挡住就往上抬）</span><span id="roCY">—</span></div>
+  <input type="range" id="rCY" min="0" max="260" step="2" value="34">
+  <div class="row"><span></span><button class="vk" id="btnFit" style="min-height:34px;padding:6px 12px">自动适配</button></div>
+</section>
+
+<script>
+/* ============================================================================
+   杯子轻量化原型：数学与 lua/src/props.lua 的 P.cup 逐行对应。
+   ★ 两种实现（可切换），这是控件预算的开关：
+     · tri  = **三角形 + 遮挡**：外锥 1 + 液锥 1 + 遮挡 1 + 液面线 1 + 杯口 1 + 高光 1 + 根 1 = 7
+              （和炮筒同一条路：千星里"三角形转 180°"就是上沿平、下收成尖）
+     · band = **叠条**：杯身 32 + 液体 16 + 液面线 1 + 杯口 1 + 高光 1 + 根 1 = 52
+   两种模式**必须看起来一样** —— tests/cup-port.mjs 会拿三角的轮廓和 halfOuter 逐点比。
+   ========================================================================== */
+window.CUP = (function(){
+  var BANDS = 32, LQ = 16;                       // ★ 与 props.lua 同值
+  var SPEC = { mouthW: 100, baseW: 69.2, h: 198, inset: 3, lipH: 8, shineW: 4, slopeDeg: 4.45 };   // ★ 与 lua 的 P.spec.cup 同步（用户圈定 2026-10-01）
+  var DRINKS = [
+    { id:'lemon',  label:'干冰柠檬', rgb:[234,243,160] },
+    { id:'brom',   label:'千溴水',   rgb:[240,180,68] },
+    { id:'coffee', label:'速溶咖啡', rgb:[138,90,52] },
+    { id:'peach',  label:'蟠桃四季', rgb:[247,168,120] },
+    { id:'milk',   label:'苹果奶绿', rgb:[191,233,168] },
+    { id:'water',  label:'通用水',   rgb:[143,208,255] },
+  ];
+  var state = { baseShine: true, drink: DRINKS[0], fill: 0.62, gaps:{ ice:false, lemon:false, fog:false }, scale: 2, mode: 'tri' };
+
+  function tanA(){ return (SPEC.mouthW - SPEC.baseW) / 2 / SPEC.h; }          // 侧壁斜率（横/竖）
+  function halfOuter(t){ return SPEC.baseW / 2 + (SPEC.mouthW - SPEC.baseW) / 2 * t; }
+  function halfInner(t){ return halfOuter(t) - SPEC.inset; }
+  function slopeDeg(){ return Math.atan(tanA()) * 180 / Math.PI; }
+  function fullConeH(){ return (SPEC.mouthW / 2) / tanA(); }                  // 杯口 → 理论尖点
+  function coneHFromBase(){ return (SPEC.baseW / 2) / tanA(); }               // 杯底 → 理论尖点
+
+  var els = {}, toppingEls = [], bodyBot = 0, bodyTop = 0;
+  function $(id){ return document.getElementById(id); }
+  function mk(cls, parent, kind){
+    var d = document.createElement('div');
+    if (cls) d.className = cls;
+    if (kind) d.setAttribute('data-k', kind);
+    parent.appendChild(d);
+    return d;
+  }
+  // x/y = 相对**杯子根中心**的设计像素（y 向上为正，与 props.lua 一致）
+  function place(el, x, y, w, h){
+    el.style.width = w + 'px'; el.style.height = h + 'px';
+    el.style.transform = 'translate(-50%,-50%) translate(' + x + 'px,' + (-y) + 'px)';
+  }
+
+  // ── ★ VIS：逐步视觉增量（**镜像 lua/src/recipes.lua 的 vis 字段**；测试会比对两边是否一致）──
+  var PRODUCTS = [
+    { id: 'dryice',     name: '干冰干柠檬水' },
+    { id: 'qilin',      name: '白芝麻火麒麟' },
+    { id: 'bromine',    name: '空杯满杯千溴水' },
+    { id: 'instcoffee', name: '现萃速溶咖啡' },
+    { id: 'newton',     name: '牛顿苹果奶绿' },
+    { id: 'peach',      name: '蟠桃四季春' },
+  ];
+  var VIS = {
+    // ★ 2026-10-01 用户改定：**先压缩、后加水**（空杯才压得动空气；干冰遇水才冒雾）
+    dryice: [
+      { t: '双手握住杯子，稳住（别让气跑掉）', kind: 'hold', vis: { pulse: 'shake' } },
+      { t: '快速压缩内部空气至 25000 千帕', kind: 'mash', taps: 6, vis: { pulse: 'ripple', onDone: { state: 'bubble' } } },
+      { t: '继续压缩，直至出现固态干冰', kind: 'mash', taps: 6, vis: { pulse: 'ripple', onDone: { state: 'dryice' }, quip: '0.04% 也是本店的客人。' } },
+      { t: '放入干柠檬片', kind: 'tap', vis: { add: 'lemon' } },
+      { t: '加水至七分满（干冰遇水，冒雾）', kind: 'tap', vis: { fill: 0.70, color: 'lemon', state: 'fogburst', pulse: 'flash' } },
+      { t: '封杯出餐', kind: 'tap', vis: { lid: true } },
+    ],
+    qilin: [
+      { t: '掏出枪筒', kind: 'tap', vis: { tool: 'torch' } },
+      { t: '用喷火枪烤香，烤完直接递给客人（甜筒不用打包）', kind: 'hold', vis: { tool: 'torch', pulse: 'flash' } },
+    ],
+    bromine: [
+      { t: '用量筒取 10ml 溴水原液', kind: 'hold', vis: { fill: 0.15, color: 'brom' } },
+      { t: '加满空杯至满杯', kind: 'mash', taps: 5, vis: { fill: 1.00, color: 'brom' } },
+      { t: '摇匀至颜色均一', kind: 'mash', taps: 4, vis: { pulse: 'shuffle', mix: 'uniform', onDone: { state: 'foam' } } },
+      { t: '封杯出餐', kind: 'tap', vis: { lid: true } },
+    ],
+    instcoffee: [
+      { t: '取速溶咖啡粉', kind: 'tap', vis: { tool: 'coffee' } },
+      { t: '放入咖啡机粉碗', kind: 'tap', vis: { tool: 'coffee' } },
+      { t: '按下萃取键', kind: 'tap', vis: { tool: 'coffee' } },
+      { t: '注入热水', kind: 'tap', vis: { fill: 1.00, color: 'coffee', state: 'steam' } },
+      { t: '封杯出餐', kind: 'tap', vis: { lid: true } },
+    ],
+    newton: [
+      { t: '把苹果砸进杯子里（重力加速度请自行脑补）', kind: 'mash', taps: 4, vis: { pulse: 'splash', onDone: { add: 'apple' } } },
+      { t: '注入绿茶汤', kind: 'tap', vis: { fill: 0.55, color: [122, 168, 92] } },
+      { t: '加入奶精', kind: 'tap', vis: { mix: 'milky' } },
+      { t: '注入牛奶', kind: 'hold', vis: { fill: 1.00, color: 'milk' } },
+      { t: '封杯出餐', kind: 'tap', vis: { lid: true } },
+    ],
+    peach: [
+      { t: '注入四季春茶汤', kind: 'hold', vis: { fill: 0.70, color: [168, 172, 96] } },
+      { t: '炙烤杯口（烤出焦糖香）', kind: 'hold', vis: { rim: 'caramel', pulse: 'flash' } },
+      { t: '加入蟠桃果肉并摇匀', kind: 'mash', taps: 5, vis: { pulse: 'shuffle', color: 'peach', onDone: { add: 'peach' } } },
+      { t: '封杯出餐', kind: 'tap', vis: { lid: true } },
+    ],
+  };
+
+  function emptyContent() {
+    return { fill: 0, color: [143, 208, 255], mix: 0, milky: 0, rim: false, lid: false,
+             toppings: { ice: 0, lemon: 0, peach: 0, apple: 0 },
+             states: { bubble: false, dryice: false, foam: false, steam: false } };
+  }
+  var content = emptyContent();
+  var PLAY = { id: 'dryice', step: 0, hits: 0, startFill: 0, done: false };
+
+  function resolveColor(c) {
+    if (typeof c === 'string') for (var i = 0; i < DRINKS.length; i++) if (DRINKS[i].id === c) return DRINKS[i].rgb;
+    return c;
+  }
+  function mixWhite(rgb, t) { return [Math.round(rgb[0] + (250 - rgb[0]) * t), Math.round(rgb[1] + (250 - rgb[1]) * t), Math.round(rgb[2] + (250 - rgb[2]) * t)]; }
+
+  // 把内容画出来（液体 + 配料 + 状态 + 杯口 + 盖子）
+  function renderContent() {
+    var cup = document.getElementById('cup');
+    var col = content.milky > 0 ? mixWhite(content.color, content.milky * 0.6) : content.color;
+    state.drink = { id: 'custom', rgb: col };
+    setFill(content.fill);
+    var surfY = bodyBot + content.fill * SPEC.h;
+    // 清掉上一次的内容件
+    for (var i = 0; i < toppingEls.length; i++) if (toppingEls[i].remove) toppingEls[i].remove();
+    toppingEls = [];
+    function put(cls, x, y, w, h, rot) {
+      var el = mk(cls, cup, 'content'); toppingEls.push(el);
+      place(el, x, y, w, h); if (rot) el.style.transform += ' rotate(' + rot + 'deg)';
+      return el;
+    }
+    if (content.fill > 0.03) {
+      if (content.toppings.ice > 0) for (var k = 0; k < content.toppings.ice; k++) put('cube', (k - 1) * 16, surfY + 2, 14, 12, 18 + k * 12);
+      if (content.toppings.lemon > 0) for (var l = 0; l < content.toppings.lemon; l++) put('lemonS', -10 + l * 20, surfY - 3, 26, 26, 0);
+      if (content.toppings.peach > 0) for (var q = 0; q < content.toppings.peach; q++) put('chunk', (q - 2) * 13, bodyBot + 16 + (q % 2) * 10, 11, 9, q * 25);
+      if (content.toppings.apple > 0) for (var a = 0; a < content.toppings.apple; a++) put('chunkAp', (a - 1) * 15, bodyBot + 14 + a * 6, 12, 10, a * 30);
+      if (content.states.foam) put('foam', 0, surfY + 4, halfInner(content.fill) * 2 - 4, 6, 0);
+      if (content.states.bubble) for (var b = 0; b < 4; b++) put('bub', (b - 1.5) * 9, bodyBot + 12 + b * 9, 5, 5, 0);
+      if (content.states.dryice || content.states.fogburst) {
+        // 空杯时（液面 0）雾从杯口冒；加水后（fogburst）雾更猛、更宽
+        var burst = content.states.fogburst;
+        var fogY = content.fill > 0.03 ? surfY + 5 : bodyBot + 10;
+        put('', 0, bodyTop + (burst ? 34 : 22), SPEC.mouthW + (burst ? 66 : 40), burst ? 96 : 60, 0).id = 'dryiceFog';
+        put('', 0, fogY, (content.fill > 0.03 ? halfInner(content.fill) * 2 : SPEC.baseW) + (burst ? 8 : 0), 4, 0)
+          .style.background = burst ? 'rgba(255,255,255,.75)' : 'rgba(255,255,255,.55)';
+      }
+      if (content.states.steam) put('steam', 0, bodyTop + 26, SPEC.mouthW * 0.7, 52, 0);
+    }
+    if (content.rim) put('', 0, bodyTop - SPEC.lipH, SPEC.mouthW + 6, 4, 0).id = 'rim';
+    if (content.lid) put('', 0, bodyTop + 2, SPEC.mouthW + 10, 7, 0).id = 'lid';
+  }
+  function pulse(kind) {
+    var w = document.getElementById('cupWrap');
+    if (!w || !w.classList) return;
+    w.classList.remove('pulse-shake', 'pulse-ripple', 'pulse-splash', 'pulse-shuffle', 'pulse-flash');
+    void (w.offsetWidth);
+    w.classList.add('pulse-' + kind);
+  }
+  function applyVis(v) {
+    if (v.fill != null) content.fill = v.fill;
+    if (v.color) content.color = resolveColor(v.color);
+    if (v.add) content.toppings[v.add] = (content.toppings[v.add] || 0) + 1;
+    if (v.state) content.states[v.state] = true;
+    if (v.mix === 'uniform') content.mix = 1;
+    if (v.mix === 'milky') content.milky = Math.min(1, content.milky + 0.5);
+    if (v.rim) content.rim = true;
+    if (v.lid) content.lid = true;
+    if (v.pulse) pulse(v.pulse);
+    renderContent();
+  }
+  function playReset() { content = emptyContent(); PLAY.step = 0; PLAY.hits = 0; PLAY.startFill = 0; PLAY.done = false; LAST_DONE = null; renderContent(); }
+  function playLoad(id) { PLAY.id = VIS[id] ? id : 'dryice'; playReset(); return PLAY; }
+  var LAST_DONE = null;
+  function playHit() {
+    var steps = VIS[PLAY.id] || [], st = steps[PLAY.step];
+    if (!st || PLAY.done) return { done: true };
+    var v = st.vis || {};
+    LAST_DONE = st;                       // 记下刚做完的这一步（完成后要报它的台词）
+    if (st.kind === 'mash') {
+      PLAY.hits++;
+      if (v.fill != null) { content.fill = PLAY.startFill + (v.fill - PLAY.startFill) * (PLAY.hits / (st.taps || 1)); renderContent(); }
+      if (v.pulse) pulse(v.pulse);
+      if (PLAY.hits >= (st.taps || 1)) {
+        PLAY.hits = 0; PLAY.startFill = content.fill;
+        if (v.onDone) applyVis(v.onDone);
+        PLAY.step++;
+      }
+    } else {
+      applyVis(v);
+      PLAY.step++;
+    }
+    if (PLAY.step >= steps.length) PLAY.done = true;
+    return { step: PLAY.step, hits: PLAY.hits, done: PLAY.done };
+  }
+
+  function build(){
+    var cup = $('cup');
+    cup.innerHTML = '';
+    cup.style.width = SPEC.mouthW + 'px'; cup.style.height = SPEC.h + 'px';
+    els = {}; toppingEls = [];
+    bodyBot = -SPEC.h / 2; bodyTop = SPEC.h / 2;
+    if (state.mode === 'tri') buildTri(cup); else buildBand(cup);
+    setFill(state.fill);
+    renderContent();          // ★ 内容（配料/状态/盖子）也重画：build 会清空子件
+  }
+
+  /* ---------- 实现 A：三角形 + 遮挡（7 控件） ---------- */
+  function buildTri(cup){
+    var Hc = fullConeH(), Cb = coneHFromBase();
+    // ① 外锥：上沿宽 = 口径、上沿贴杯口；下收成理论尖点（远在杯底之下）
+    var bt = mk('tri', cup, 'bodyTri');
+    bt.style.background = 'rgba(224,240,255,.31)';
+    place(bt, 0, bodyTop - Hc / 2, SPEC.mouthW, Hc);
+    els.bodyTri = bt;
+    // ② 液锥（上沿在液面、宽度 = 该处的内壁宽；尖点同样在杯底之下）
+    var lt = mk('tri', cup, 'liqTri');
+    els.liqTri = lt;
+    // ③ 液面亮线
+    var top = mk('', cup, 'liqTop'); top.id = 'liqTop'; els.liqTop = top;
+    // ④ 遮挡：盖住**杯底以下**（两个锥体的下段都靠它假装不存在）
+    var mask = mk('mask', cup, 'mask'); els.mask = mask;
+    // ★ 遮挡块**收紧到刚好够**（2026-10-01 用户报"杯子下方被挡住"）：
+    //   它的唯一职责是盖住"杯底以下那截锥尖"。原来是 口径+8 宽 × (锥尖高+60) 的大方块，
+    //   在渐变背景上就是一块很显眼的深色矩形。现在只比杯底宽 4px、刚好盖住锥尖。
+    //   ⚠️ 颜色仍必须与**背后一致**（画布底色 / 卡片色）——这是平台限制：
+    //      千星"父控件不裁子控件"，想让图形被裁只能用同色遮挡块。
+    var mh = Cb + 6;
+    // ★ 上沿**压进杯身 0.6px**（和叠条方案的 bandH+0.6 同一个道理）：
+    //   正好"顶着"时，两块的边缘差半像素就会露一条硬缝 —— 这就是"遮挡的地方太生硬"。
+    var overlap = 0.6;
+    place(mask, 0, bodyBot + overlap - mh / 2, SPEC.baseW + 4, mh);
+    // ⑤⑥ 杯口亮边 / 高光
+    addLipShine(cup);
+  }
+
+  /* ---------- 实现 B：叠条（52 控件，旧方案留作对比） ---------- */
+  function buildBand(cup){
+    var hh = SPEC.h, bandH = hh / BANDS;
+    els.body = [];
+    for (var i = 1; i <= BANDS; i++) {
+      var t = (i - 0.5) / BANDS;
+      var b = mk('bodyB', cup, 'body');
+      place(b, 0, bodyBot + (i - 0.5) * bandH, halfOuter(t) * 2, bandH + 0.6);
+      els.body.push({ el: b, t: t });
+    }
+    els.liq = [];
+    for (var j = 1; j <= LQ; j++) els.liq.push({ el: mk('liqB', cup, 'liq'), t0: (j - 1) / LQ });
+    var top = mk('', cup, 'liqTop'); top.id = 'liqTop'; els.liqTop = top;
+    addLipShine(cup);
+  }
+  function addLipShine(cup){
+    // 可选：杯底亮边（一条很淡的水平线）—— 把"遮挡的切边"变成"设计好的边"
+    var bs = mk('', cup, 'base'); bs.id = 'base';
+    // ★ 比杯底**窄 2px**、底边正好压在底线上（原来写的是 底径+4 ⇒ 两边各凸出 2px）
+    place(bs, 0, bodyBot + 1, SPEC.baseW - 2, 2);
+    els.base = bs; bs.style.display = state.baseShine ? 'block' : 'none';
+    var lip = mk('', cup, 'lip'); lip.id = 'lip';
+    place(lip, 0, bodyTop - SPEC.lipH / 2, SPEC.mouthW + 4, SPEC.lipH);
+    els.lip = lip;
+    var sh = mk('', cup, 'shine'); sh.id = 'shine';
+    place(sh, -(SPEC.mouthW / 2 - SPEC.inset - SPEC.shineW - 6), 0, SPEC.shineW, SPEC.h * 0.82);
+    els.shine = sh;
+  }
+
+  function setFill(frac){
+    frac = Math.max(0, Math.min(1, frac || 0));
+    state.fill = frac;
+    content.fill = frac;               // ★ 手动滑块与播放器共用同一个 fill
+    var rgb = state.drink.rgb, surfY = bodyBot + frac * SPEC.h;
+    if (state.mode === 'tri') {
+      var lt = els.liqTri;
+      if (frac <= 0.002) { place(lt, 0, 0, 0, 0); place(els.liqTop, 0, 0, 0, 0); }
+      else {
+        var half = halfInner(frac), w = half * 2, hL = half / tanA();
+        lt.style.background = 'rgba(' + rgb.join(',') + ',.94)';
+        place(lt, 0, surfY - hL / 2, w, hL);
+        place(els.liqTop, 0, surfY, w, 2);
+      }
+      return;
+    }
+    for (var i = 0; i < LQ; i++) {
+      var b = els.liq[i], t0 = b.t0, vis = frac - t0;
+      if (vis <= 0.002) place(b.el, 0, 0, 0, 0);
+      else {
+        var cover = Math.min(vis, 1 / LQ), tm = t0 + cover / 2;
+        place(b.el, 0, bodyBot + tm * SPEC.h, halfInner(tm) * 2, cover * SPEC.h + 0.6);
+      }
+      b.el.style.background = 'rgba(' + rgb.join(',') + ',.94)';
+    }
+    if (frac <= 0.002) place(els.liqTop, 0, 0, 0, 0);
+    else place(els.liqTop, 0, surfY, halfInner(frac) * 2, 2);
+  }
+  function setDrink(id){
+    for (var i = 0; i < DRINKS.length; i++) if (DRINKS[i].id === id) { state.drink = DRINKS[i]; content.color = DRINKS[i].rgb; content.milky = 0; }
+    renderContent();
+  }
+  function setMode(m){ if (m === state.mode) return; state.mode = m; build(); }
+
+  function renderToppings(){
+    var cup = $('cup');
+    for (var i = 0; i < toppingEls.length; i++) if (toppingEls[i].remove) toppingEls[i].remove();
+    toppingEls = [];
+    var surfY = bodyBot + state.fill * SPEC.h;
+    if (state.gaps.ice && state.fill > 0.05) {
+      [[-0.22, 0.02], [0.16, -0.03], [0.02, 0.06]].forEach(function (o) {
+        var s = mk('ice', cup, 'ice'); toppingEls.push(s);
+        place(s, halfInner(state.fill) * o[0] * 2, surfY + o[1] * SPEC.h, 14, 12);
+        s.style.transform += ' rotate(18deg)';        // ★ 先 place 再旋转（顺序反了会被覆盖）
+      });
+    }
+    if (state.gaps.lemon && state.fill > 0.05) {
+      var l = mk('lemon', cup, 'lemon'); toppingEls.push(l);
+      place(l, halfInner(state.fill) * 0.45, surfY - 2, 26, 26);
+    }
+    if (state.gaps.fog) {
+      var f = mk('', cup, 'fog'); f.id = 'fog'; toppingEls.push(f);
+      place(f, 0, bodyTop - 10, SPEC.mouthW + 26, 34);
+    }
+  }
+
+  function placed(){
+    var out = [];
+    (els.body || []).forEach(function(b){ out.push(rd(b.el)); });
+    (els.liq || []).forEach(function(b){ out.push(rd(b.el)); });
+    ['bodyTri','liqTri','liqTop','mask','base','lip','shine'].forEach(function(k){ if (els[k]) out.push(rd(els[k])); });
+    function rd(el){
+      var tr = String(el.style.transform || '');
+      var m = tr.match(/translate\(([-\d.]+)px,\s*([-\d.]+)px\)/);
+      return { kind: el.getAttribute('data-k') || (el.id || ''),
+               x: m ? parseFloat(m[1]) : 0, y: m ? -parseFloat(m[2]) : 0,
+               w: parseFloat(el.style.width) || 0, h: parseFloat(el.style.height) || 0 };
+    }
+    return out;
+  }
+
+  return {
+    BANDS:BANDS, LQ:LQ, SPEC:SPEC, DRINKS:DRINKS, state:state, VIS:VIS, PRODUCTS:PRODUCTS,
+    content: function(){ return content; },
+    renderContent: renderContent, pulse: pulse,
+    play: function(){ return PLAY; }, playLoad: playLoad, playHit: playHit, playReset: playReset,
+    lastDone: function(){ return LAST_DONE; },
+    quipOf: function(st){ return st && st.vis && st.vis.quip ? st.vis.quip : null; },
+    steps: function(id){ return VIS[id] || []; },
+    step: function(){ return (VIS[PLAY.id] || [])[PLAY.step] || null; },
+    halfOuter:halfOuter, halfInner:halfInner, slopeDeg:slopeDeg, tanA:tanA,
+    fullConeH:fullConeH, coneHFromBase:coneHFromBase,
+    build:build, setFill:setFill, setDrink:setDrink, setMode:setMode, renderToppings:renderToppings,
+    controlCount: function(){ return state.mode === 'tri' ? 7 : (BANDS + LQ + 1 + 2 + 1); },
+    placed: placed,
+    geom: function(){ return { mouthW:SPEC.mouthW, baseW:SPEC.baseW, h:SPEC.h, inset:SPEC.inset, slopeDeg:slopeDeg() }; },
+  };
+})();
+
+/* ---------------------------- 页面接线 ---------------------------- */
+(function(){
+  if (typeof document === 'undefined' || !document.getElementById) return;
+  var C = window.CUP;
+  var $ = function(id){ return document.getElementById(id); };
+
+  // ★ 手动控件与播放器**共用同一个内容模型**（content）——
+  //   否则两边各记一份状态、各清一次子件，会互相把对方画的东西删掉。
+  function readout(){
+    var g = C.geom();
+    $('roCount').textContent = C.controlCount() + (C.state.mode === 'tri' ? '（三角+遮挡）' : '（32+16+1+2+1）');
+    $('roMouth').textContent = g.mouthW.toFixed(1);
+    $('roBase').textContent = g.baseW.toFixed(1);
+    $('roH').textContent = g.h.toFixed(0);
+    $('roSlope').textContent = g.slopeDeg.toFixed(2) + '°';
+    $('roFill').textContent = Math.round(C.content().fill * 100) + '%';
+    $('roFillY').textContent = (-C.SPEC.h / 2 + C.content().fill * C.SPEC.h).toFixed(1);
+    $('roScale').textContent = '×' + C.state.scale.toFixed(2);
+    var ct = C.content(), bits = [];
+    if (ct.toppings.ice) bits.push('冰块×' + ct.toppings.ice);
+    if (ct.toppings.lemon) bits.push('柠檬×' + ct.toppings.lemon);
+    if (ct.toppings.peach) bits.push('果肉×' + ct.toppings.peach);
+    if (ct.toppings.apple) bits.push('苹果×' + ct.toppings.apple);
+    ['dryice','fogburst','bubble','foam','steam'].forEach(function(k){ if (ct.states[k]) bits.push(k === 'fogburst' ? '冒雾爆发' : k); });
+    if (ct.rim) bits.push('焦糖口');
+    if (ct.lid) bits.push('已封杯');
+    $('roTop').textContent = bits.length ? bits.join(' + ') : '无';
+    var mk = C.placed().find(function(x){ return x.kind === 'mask'; });
+    if ($('roMask') && mk) $('roMask').textContent = '杯底 + 0.6px（压进杯身防缝），宽 ' + mk.w.toFixed(0);
+    // 播放器读数
+    var P = C.play(), st = C.step();
+    var q = document.getElementById('roQuip');
+    if (q) {
+      var qs = C.quipOf(C.lastDone());
+      q.textContent = qs ? '「' + qs + '」' : '—';
+    }
+    $('roStep').textContent = st ? (P.step + 1) + '/' + C.steps(P.id).length + '  ' + st.t : '（已走完）';
+    $('roHits').textContent = st && st.kind === 'mash' ? (P.hits + '/' + (st.taps || 1) + ' 次') : (st ? st.kind : '—');
+    $('roLiq').textContent = Math.round(C.content().fill * 100) + '%';
+    $('roCont').textContent = C.content().color ? 'rgb(' + C.content().color.join(',') + ')' : '—';
+    $('lbMouth').textContent = C.SPEC.mouthW.toFixed(0);
+    $('lbBase').textContent = C.SPEC.baseW.toFixed(1);
+    $('lbH').textContent = C.SPEC.h.toFixed(0);
+  }
+  function rebuild(){ C.build(); readout(); }
+  function setScale(s){ C.state.scale = s; $('cupWrap').style.setProperty('--s', s); $('rScale').value = s; readout(); }
+  function setCY(px){ C.state.cy = px; $('cupWrap').style.setProperty('--cy', px + 'px');
+    var r = $('rCY'); if (r) r.value = px; if ($('roCY')) $('roCY').textContent = px + 'px（距舞台底）'; }
+  function autoFit(){
+    var st = $('stage');
+    var stageH = (st.getBoundingClientRect ? st.getBoundingClientRect().height : 400) || 400;
+    var avail = stageH - (C.state.cy || 0) - 24;
+    setScale(Math.max(0.8, Math.min(4, avail / C.SPEC.h)));
+    return { stageH: stageH, avail: avail, scale: C.state.scale };
+  }
+  function on(id, ev, fn){ var e = $(id); if (e) e.addEventListener(ev, fn); }
+
+  on('rMouth','input', function(e){ C.SPEC.mouthW = parseFloat(e.target.value); if (C.SPEC.baseW > C.SPEC.mouthW) C.SPEC.baseW = C.SPEC.mouthW; $('rBase').value = C.SPEC.baseW; rebuild(); });
+  on('rBase','input',  function(e){ C.SPEC.baseW = Math.min(parseFloat(e.target.value), C.SPEC.mouthW); rebuild(); });
+  on('rH','input',     function(e){ C.SPEC.h = parseFloat(e.target.value); rebuild(); });
+  on('rFill','input',  function(e){ C.setFill(parseFloat(e.target.value) / 100); readout(); });
+  on('rScale','input', function(e){ setScale(parseFloat(e.target.value)); });
+  on('rCY','input',    function(e){ setCY(parseFloat(e.target.value)); });
+  on('btnFit','click', function(){ autoFit(); });
+  on('btnAct','click', function(){ C.playHit(); readout(); });
+  on('btnReset','click', function(){ C.playReset(); readout(); });
+  if (window.addEventListener) window.addEventListener('resize', function(){ autoFit(); });
+
+  Array.prototype.forEach.call(document.querySelectorAll('[data-shape]'), function(b){
+    b.addEventListener('click', function(){
+      var k = b.getAttribute('data-shape');
+      if (k === 'now')        { C.SPEC.mouthW = 100; C.SPEC.baseW = 69.2; C.SPEC.h = 198; }
+      else if (k === 'steep') { C.SPEC.mouthW = 100; C.SPEC.baseW = 46;   C.SPEC.h = 198; }
+      else                    { C.SPEC.mouthW = 100; C.SPEC.baseW = 83;   C.SPEC.h = 198; }
+      $('rMouth').value = C.SPEC.mouthW; $('rBase').value = C.SPEC.baseW; $('rH').value = C.SPEC.h;
+      rebuild();
+    });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-mode]'), function(b){
+    b.addEventListener('click', function(){
+      C.setMode(b.getAttribute('data-mode'));
+      Array.prototype.forEach.call(document.querySelectorAll('[data-mode]'), function(x){ x.classList.toggle('on', x === b); });
+      readout();
+    });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-fill]'), function(b){
+    b.addEventListener('click', function(){ C.setFill(parseFloat(b.getAttribute('data-fill')) / 100); $('rFill').value = C.content().fill * 100; readout(); });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-top]'), function(b){
+    b.addEventListener('click', function(){
+      var k = b.getAttribute('data-top');
+      if (k === 'ice')        C.content().toppings.ice = C.content().toppings.ice ? 0 : 4;
+      else if (k === 'lemon') C.content().toppings.lemon = C.content().toppings.lemon ? 0 : 1;
+      else                    C.content().states.dryice = !C.content().states.dryice;
+      if (C.state.fill < 0.1) C.setFill(0.7);
+      b.classList.toggle('on', k === 'ice' ? !!C.content().toppings.ice : (k === 'lemon' ? !!C.content().toppings.lemon : C.content().states.dryice));
+      C.renderContent(); readout();
+    });
+  });
+  (function(){
+    var box = $('drinkBtns');
+    C.DRINKS.forEach(function(d){
+      var b = document.createElement('button');
+      b.className = 'vk'; b.setAttribute('data-drink', d.id); b.textContent = d.label;
+      b.style.borderColor = 'rgb(' + d.rgb.join(',') + ')';
+      b.addEventListener('click', function(){ C.setDrink(d.id); readout(); });
+      box.appendChild(b);
+    });
+    var pb = $('prodBtns');
+    C.PRODUCTS.forEach(function(pr){
+      var b = document.createElement('button');
+      b.className = 'vk'; b.setAttribute('data-prod', pr.id); b.textContent = pr.name;
+      b.addEventListener('click', function(){
+        C.playLoad(pr.id);
+        Array.prototype.forEach.call(document.querySelectorAll('[data-prod]'), function(x){ x.classList.toggle('on', x === b); });
+        readout();
+      });
+      pb.appendChild(b);
+    });
+  })();
+  function setBg(color){
+    $('stage').style.background = color;
+    $('cup').style.setProperty('--mask', color);
+    Array.prototype.forEach.call(document.querySelectorAll('[data-bg]'), function(b){ b.classList.toggle('on', b.getAttribute('data-bg') === color); });
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('[data-bg]'), function(b){
+    b.addEventListener('click', function(){ setBg(b.getAttribute('data-bg')); });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-opt]'), function(b){
+    b.addEventListener('click', function(){
+      var k = b.getAttribute('data-opt');
+      if (k === 'baseline') { C.state.baseShine = !C.state.baseShine; rebuild(); }
+      else {
+        var stage = $('stage'), grad = stage.style.background.indexOf('radial') >= 0;
+        stage.style.background = grad ? '#0b0e15' : 'radial-gradient(320px 220px at 50% 62%,#1a2133,#0b0e15 70%)';
+      }
+      b.classList.toggle('on', k === 'baseline' ? C.state.baseShine : false);
+    });
+  });
+
+  // 测试缝：布局（自动适配是否把杯子完整放进舞台）
+  window.CUPLAYOUT = function(){
+    var st = $('stage');
+    return { cy: C.state.cy || 0, scale: C.state.scale, h: C.SPEC.h,
+             stageH: (st.getBoundingClientRect ? st.getBoundingClientRect().height : 400) || 400,
+             topEdgeFromBottom: (C.state.cy || 0) + C.SPEC.h * C.state.scale };
+  };
+  window.CUPAUTOFIT = autoFit;
+
+  rebuild();
+  setCY(28);
+  autoFit();
+  C.playLoad('dryice');
+  readout();
+})();
+</script>
+</body>
+</html>

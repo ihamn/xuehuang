@@ -35,7 +35,8 @@ function S.new(modeName)
     money = 0, rentPaid = 0, rentDebt = 0,
     served = 0, mistakes = 0, left = 0, leftWaiting = 0,
     score = 0, combo = 0, maxCombo = 0,
-    today = { served = 0, money = 0, left = 0, mistakes = 0 },
+    today = { served = 0, money = 0, left = 0, mistakes = 0,
+              eco = { fixed = 0, zwd = 0 } },   -- ★ 环保凭证的当日累加（固化量 + 已折好的津元；每天归零）
     dayStats = {},
     log = {},
     ended = false,

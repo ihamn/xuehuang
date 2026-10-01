@@ -200,6 +200,13 @@ function O.finish(s, o, now)
   local addCups = o.need - already
   s.served = s.served + addCups
   s.today.served = s.today.served + addCups
+  -- ★ 环保凭证：每出一杯，把这杯**固化**的 CO₂ 与它**已折好的津元**累加进当日
+  --   （不做排碳计算、也不在结算时换算 —— 见 recipes.ECO 的成品常数）
+  for _, c in ipairs(o.cups) do
+    local e = R.eco(c.rec)
+    local te = s.today.eco
+    if te then te.fixed = te.fixed + e.fixed; te.zwd = te.zwd + e.zwd end
+  end
   for i = #s.orders, 1, -1 do if s.orders[i] == o then table.remove(s.orders, i) end end
   return { earn = earn, score = sc, perfect = perfect, fast = fast, tip = tip, cups = addCups }
 end

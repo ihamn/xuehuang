@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>压缩干冰 · 最小实现</title>
+<style>
+  :root{ --bg:#0e1016; --panel:#1a2030; --line:#2c364d; --ink:#e9eefb; --dim:#8e9bb5; --gold:#ffcf6b; --lemon:#f2e27a; }
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 system-ui,"PingFang SC",sans-serif;padding:10px 10px 14px;user-select:none;-webkit-user-select:none}
+  h1{font-size:16px;margin:4px 0 2px} .hint{color:var(--dim);font-size:12px;margin:0 0 10px;line-height:1.6}
+  section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:10px}
+  section h2{font-size:13px;margin:0 0 8px;color:var(--gold)}
+  .row{display:flex;justify-content:space-between;gap:8px;padding:3px 0;font-size:13px;font-variant-numeric:tabular-nums}
+  .row b{color:#fff}
+  .grid{display:grid;gap:6px}
+  button.vk{appearance:none;border:1px solid #3a4560;background:#222b3f;color:var(--ink);border-radius:10px;padding:10px 4px;font:600 12px/1.2 system-ui;touch-action:manipulation;min-height:42px}
+  button.vk:active,button.vk.on{background:#3a7bd5;border-color:#6ea8ff}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:34px;background:transparent;margin:2px 0}
+  input[type=range]::-webkit-slider-runnable-track{height:8px;border-radius:4px;background:#2b3550}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:28px;height:28px;margin-top:-10px;border-radius:50%;background:#6ea8ff;border:2px solid #cfe1ff}
+  #stage{position:relative;height:clamp(320px,54dvh,470px);background:#0b0e15;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:10px}
+  #flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none}
+  #flash.on{animation:flash .28s ease-out 1}
+  @keyframes flash{0%{opacity:.85}100%{opacity:0}}
+  #hud{position:absolute;left:10px;top:8px;font-size:12px;color:var(--dim);line-height:1.7;z-index:6}
+  #hud b{color:#fff}
+  /* 场景：杯子与锤子同一套设计像素、同一个缩放（与柠檬锤页同一规矩） */
+  #scene{position:absolute;left:50%;bottom:16px;width:100px;height:392px;
+         transform:translateX(-50%) scale(var(--zoom,1));transform-origin:50% 100%}
+  #cupWrap{position:absolute;left:0;bottom:0;width:100px;height:198px;transform-origin:50% 100%}
+  #cup{position:relative;width:100px;height:198px}
+  #cup > div{position:absolute;left:50%;top:50%}
+  .tri{clip-path:polygon(0 0,100% 0,50% 100%)}
+  #liqTop{background:rgba(255,255,255,.5)}
+  .mask{background:var(--mask,#0b0e15)}
+  .bub{background:rgba(255,255,255,.6);border-radius:50%}
+  .frost{background:rgba(255,255,255,.72);border-radius:2px}
+  /* ── 干冰的样子（2026-10-01 重做：用户说"没感觉"）─────────────────────
+     关键在**雾的走向**：干冰的白雾是**冷、重、往下淌**的（CO₂ 比空气重）；
+     热气才是往上飘。TPT 的 CO2.cpp 也是 `Gravity 0.1`（重气体、往下沉）——
+     我上一版让雾往上飘，跟自己抄的来源都矛盾。
+     千星没有渐变 ⇒ 雾用**多层方块**叠、越往下越宽越淡，假装"流淌"。 */
+  /* ★★ 白气重做（2026-10-01 用户："太廉价"）──────────────────────────────
+     上一版是**几根大圆角色块**往下掉 ⇒ 一眼就是"贴了几张卡片"。
+     真白气是**碎絮**：小块、大小不一、有旋角、透明度分层、而且是从**杯沿两侧溢出来**。
+     这里用**扁平碎片**拼（千星只有扁平块 ⇒ 页面不作弊，两边画法一致）：
+       密度足够多 + 单块够小 + 透明度错开 ⇒ 叠起来才有"一团"的感觉，而不是"一根"。 */
+  /* ★ 2026-10-01：白气改用**圆/椭圆**（千星 100002 圆；浏览器 border-radius:50%）
+     —— 方块再小也带棱角，圆形叠起来才像雾。片数不变，只是换了形状。 */
+  .wisp{background:rgba(236,246,255,.55);border-radius:50%}        /* 一片白气（椭圆） */
+  .fogpool{background:rgba(233,244,255,.30);border-radius:50%}     /* 桌面雾滩（几片扁的椭圆）*/
+  .frostwall{background:rgba(226,240,255,.34);border-radius:3px}   /* 杯壁上的霜（越往上越薄）*/
+  .frostrim{background:rgba(240,248,255,.75);border-radius:3px}    /* 杯口霜边 */
+  /* 干冰碎块：顶面亮、右下暗 ⇒ 有立体感，堆起来才看得出一层压一层 */
+  .chunk{background:#f4fbff;border-radius:3px;
+         box-shadow:inset 0 2px 0 rgba(255,255,255,.95), inset -2px -3px 0 rgba(184,210,236,.85)}
+  .chunkTop{background:#ffffff;border-radius:2px;box-shadow:inset 0 -2px 0 rgba(198,220,242,.9)}
+  .cold{background:rgba(200,226,255,.16)}                          /* 冷气罩 */
+  #hmWrap{position:absolute;left:50%;bottom:198px;margin-bottom:22px;width:62px;height:166px;transform:translateX(-50%)}
+  #hmHead{position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:62px;height:16px;background:var(--lemon);border-radius:5px;box-shadow:inset 0 -3px 0 rgba(180,160,40,.55)}
+  #hmStem{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);width:14px;height:150px;background:#d9c7a3;border-radius:4px}
+  #hmWrap.plunge{animation:plunge .24s ease-in-out 1}
+  @keyframes plunge{0%{transform:translateX(-50%) translateY(0)}45%{transform:translateX(-50%) translateY(210px)}100%{transform:translateX(-50%) translateY(0)}}
+  /* ★ 像素方案（2026-10-01 用户问"像素方案咋样"）：
+     白气也用**字符密度场**渲染 —— 一行一个文本框，一行里放一串 ░▒▓█（空格用 U+3000 表意空格）。
+     为什么是"一行一控件"而不是"一格一控件"：
+       本作火焰是 19×27=432 格（一格一控件），白气要铺满这个区域也是 300+ 格 ⇒ 付不起；
+       而**一行 1 个控件**（24 行 = 24 控件）比圆片方案（34 控件）还便宜。
+     代价：同一文本框里字号/间距固定、颜色也只能一个 ⇒ 靠**字符本身**表达浓度（不是靠 alpha）。 */
+  .pxRow{position:absolute;left:50%;white-space:pre;font-family:ui-monospace,Menlo,monospace;
+         color:#e9f5ff;text-align:center;letter-spacing:0}
+  #pad{display:grid;grid-template-columns:2fr 1fr;gap:8px}
+  #btnHit{min-height:64px;font-size:17px}
+</style>
+</head>
+<body>
+<h1>压缩干冰 · 最小实现</h1>
+<p class="hint">只做两件事：**把空气压到 25000 千帕**（6 下）→ **继续压到出固态干冰**（6 下）。<br>
+顺序按用户改定：**先压缩、后加水** ⇒ 压缩时是**空杯**（压的是空气，不是液体）。</p>
+
+<section id="stage">
+  <div id="flash"></div>
+  <div id="hud">
+    压力 <b id="roP">0</b> / 25000 千帕 · 阶段 <b id="roPhase">—</b><br>
+    连按 <b id="roHits">0/6</b> · 挤压 <b id="roSqueeze">0%</b> · 状态 <b id="roState">—</b><br>
+    杯子控件 <b id="roCupCount">—</b> · 效果件 <b id="roFxCount">—</b> · 缩放 <b id="roZoom">×1.00</b><br>
+    相变 <b id="roPhaseC">—</b> · 雾/气泡 <b id="roPart">—</b>
+  </div>
+  <div id="scene">
+    <div id="cupWrap"><div id="cup"></div></div>
+    <div id="hmWrap"><div id="hmStem"></div><div id="hmHead"></div></div>
+  </div>
+</section>
+
+<section>
+  <h2>① 下锤</h2>
+  <div id="pad">
+    <button class="vk" id="btnHit">按一下（下锤）</button>
+    <button class="vk" id="btnReset">重播</button>
+  </div>
+  <div class="row" style="margin-top:6px"><span>键盘</span><span style="font-size:11px;color:var(--dim)">空格 / 回车 / J（挡住按住连发）</span></div>
+</section>
+
+<section>
+  <h2>② 白气的画法（两种，都可上真机）</h2>
+  <div class="grid" style="grid-template-columns:repeat(2,1fr)">
+    <button class="vk on" data-whitemode="dots">烟 + ● 字符（默认）</button>
+    <button class="vk" data-whitemode="circle">烟 + 圆图元</button>
+    <button class="vk" data-whitemode="pixel">密度场（备选）</button>
+  </div>
+  <div class="row" style="margin-top:6px"><span>本模式控件数</span><b id="roWmCount">—</b></div>
+  <div class="row"><span>说明</span><span style="font-size:11px;color:var(--dim);text-align:right">
+    圆片：形状圆、位置自由；但每片都是硬边椭圆，多了会"发珠"<br>
+    像素：字符密度场，形状自由（能细能散）；但一格不能单独调色/字号</span></div>
+</section>
+
+<section>
+  <h2>③ 两种「压力曲线」——手感差别就在这</h2>
+  <div class="grid" style="grid-template-columns:repeat(3,1fr)">
+    <button class="vk on" data-curve="late">越压越猛（^1.6）</button>
+    <button class="vk" data-curve="linear">匀速（线性）</button>
+    <button class="vk" data-curve="early">一压就满（^0.6）</button>
+  </div>
+  <div class="row" style="margin-top:6px"><span>每下读数</span><b id="roCurve">—</b></div>
+  <div class="row"><span>说明</span><span style="font-size:11px;color:var(--dim);text-align:right">
+    默认"越压越猛"：前几下几乎不动，后几下暴涨 —— 配合第一下的"漏气"感<br>（压力曲线只影响读数手感，不影响机制）</span></div>
+</section>
+
+<section>
+  <h2>④ 大小</h2>
+  <input type="range" id="rZoom" min="0.6" max="1.6" step="0.05" value="1">
+  <div class="row"><span></span><button class="vk" id="btnFit" style="min-height:34px;padding:6px 12px">自动适配</button></div>
+</section>
+
+<script>
+/* ============================================================================
+   压缩干冰 · 最小实现
+   ── 机制（两个阶段，各 6 下）─────────────────────────────────────────────
+     A 阶段：压到 25000 千帕。每下：挤压 +2%（累计）、压力按曲线涨、抖动加剧
+             按满 6 下 → **气泡**出现（空气被压出溶解气）
+     B 阶段：继续压到出固态干冰。挤压继续累积（+2% → 累计 ~8%）
+             按满 6 下 → **闪白一帧 + 杯底结霜 + 干冰块 + 杯口白雾（3 层）**
+   ── 三条规矩（都来自真机踩坑）──────────────────────────────────────────
+     ① 液面/内容**不许一次跳完**：6 下均分
+     ② **没按满绝不触发**（按不满就是"什么都没发生"，那是玩家的挫败感）
+     ③ 抖动/随机数用**自己的 LCG**（千星禁 math.random ⇒ 本地也照这个约束做）
+   ── 顺序（用户 2026-10-01 改定）────────────────────────────────────────
+     先压缩、后加水 ⇒ 压缩阶段杯子是**空的**（fill 恒为 0），干冰躺在杯底。
+   ========================================================================== */
+window.DRY = (function(){
+  var CUP = { mouthW: 100, baseW: 69.2, h: 198, inset: 3 };     // ★ 已圈定规格
+  var HM  = { head: { w: 62, h: 16 }, stem: { w: 14, h: 150 }, gap: 22, plunge: 210 };
+  var TAPS = 6, P_MAX = 25000;
+
+  /* ── 物性表：**参数真从开源项目里拿的**（不是"参考了一下"）────────────────
+     出处一：The Powder Toy（GPL-3.0）元素定义 src/simulation/elements/*.cpp
+       · FOG.cpp  ：TYPE_GAS|PROP_LIFE_DEC、Loss 0.70、Gravity 0、Diffusion 0.99、Advection 0.8
+                    ⇒ 雾：**有寿命会散**、不上不下（Gravity 0）、会扩散
+       · DRIC.cpp ：Weight 100（**重 ⇒ 沉底**）、Loss 0.00（**不自散**）、
+                    HighTemperature 195.65K = -77.5℃ → PT_CO2（**升华**）
+       · CO2.cpp  ：LowTemperature 194.65K = -78.5℃ → PT_DRIC（**沉积成干冰**）
+       · ICEI.cpp ：HighPressure 0.8 → PT_SNOW（"Crushes under pressure"）
+     出处二：Sandboxels（开源）index.html
+       · carbon_dioxide: { tempLow: -78.5, stateLow: "dry_ice", density: 1.977 }
+                    ⇒ **-78.5℃** 这个数与 TPT 完全一致（两处互证）
+     ── 本页用到的三个────────────────────────────────────────────────── */
+  /* ── 干冰堆（2026-10-01 第二次重做：用户说"太少 + 互相压住不像堆叠"）──────
+     两条修法：
+       ① **块数够多**：9~11 块，铺满杯底、堆到杯高约 1/4（不然看着就是"杯底有个白块"）
+       ② **真堆叠**：每一层比下一层高一档（y 递增），上层**压在下一层的缝上**、越往上越窄；
+          画的时候**按层序**画（底层先画、上层后画）⇒ 上层自然盖住下层 ⇒ 才像一堆
+     坐标：x 相对杯心、y 相对**杯底**往上。 */
+  var PILE = [
+    // 第一层（铺满杯底，3 块，留缝）
+    [-22, 3, 21, 12, -8], [-1, 3, 22, 13, 5], [20, 3, 20, 12, 13],
+    // 第二层（压在缝上，2 块）
+    [-12, 14, 21, 12, -3], [10, 14, 22, 12, 8],
+    // 第三层（3 块，稍窄）
+    [-18, 25, 16, 11, 11], [-1, 25, 20, 12, -6], [15, 25, 15, 10, 7],
+    // 第四层（2 块）
+    [-9, 35, 18, 11, 4], [9, 35, 16, 10, -10],
+    // 顶层（小块收尖）
+    [-1, 44, 14, 9, 6],
+  ];
+
+  var SUBST = {
+    // 雾：TPT 的 Loss 0.70 是"每帧寿命衰减"⇒ 这里映射成透明度的衰减速率
+    // ★ 雾有两种走法：干冰的白雾**下沉**（CO₂ 比空气重），热气的白雾**上升**。
+    //   本页只有干冰雾 ⇒ dir = -1。
+    //   lossTpt 是 TPT 的原值（引用）；fadePerSec 是**我们映射后的调参**——雾要往下淌一秒多，
+    //   直接照搬 0.70/秒 会半路就散光。两个数都留着，谁抄的、谁调的，一眼能分。
+    // ★ 白气的**路径**（2026-10-01 用户："冒的位置不太对"）：
+    //   干冰在杯底 ⇒ 雾先在**杯内**从冰上顶起来（被杯壁收着）→ 装满后**从杯沿溢出**
+    //   → 再顺着**杯壁外侧往下淌**（CO₂ 比空气重）。上一版直接在杯沿凭空生成、杯里是空的。
+    //   risePx 是"杯内上升"的速度，**本项目调参**（不是抄来的）；
+    //   dir/fallPx 那套只管"杯外下落"，来自 TPT（重气体往下沉）。
+    // ★ 2026-10-01 用户：「我们要的应该是**飘动的雾气**」——搜 smoke/流体都搜偏了。
+    //   飘动的关键是 **drift（左右漂移）**：sparticles 库的文档写得很准——
+    //   "每个粒子会左右漂移多少，产生**漂浮或被风吹**的效果"；
+    //   再叠 **视差分层**（层数不同速度/大小/浓度）就有纵深。
+    //   所以雾不是"直着往下掉"，而是**慢慢往两边飘 + 缓缓下沉 + 悬停**。
+    fog:    { dir: -1, risePx: 0.9, fallPx: 0.34, driftAmp: [4, 14], driftHz: [0.25, 0.55],
+              layers: 3, layerSpeed: [1.0, 0.65, 0.4], layerAlpha: [1.0, 0.7, 0.45], layerSize: [1.0, 0.8, 0.6],
+              // ★ 双尺度：大而极淡的**晕** + 小而亮的**芯**。只用一种尺寸 ⇒ 一串珠子；
+              //   两种叠起来才有"一团"的观感（这是粒子烟雾的常规做法）。
+              haloEvery: 3, haloScale: 1.9, haloAlpha: 0.35, haloSpeed: 0.6,
+              spreadPerSec: 0.5, fadePerSec: 0.30,
+              lossTpt: 0.70, gravity: 0.1,
+              // ★ 2026-10-01 用户「冒的太少」⇒ 片数 14→30、尺寸放大、浓度提高，
+              //   白气在杯沿**多停一会儿**（overSpeed 调慢）⇒ 杯口形成一层浓罩
+              wisps: 30, wispsDots: 90,   // ★ 字符模式可以**放心加粒子**：控件数只跟"行数"有关
+                                          //   （同一行的粒子共用一个文本框）⇒ 90 片也是 26 个控件
+              wispW: [14, 34], wispWMax: 44, wispH: [10, 22], wispA: 0.62,
+              overSpeed: 0.55, driftPx: [0.06, 0.16], art: 100002,   // ★ 圆（千星图元号）；页面用 border-radius:50%
+              src: 'TPT FOG.cpp(Loss 0.70) + CO2.cpp(Gravity 0.1 重气体往下沉)；杯内上升为本项目调参' },
+    // 气泡：TPT 说 CO2 是"重气体、往下飘"（Gravity 0.1）⇒ 在液体里上浮得**慢**
+    bubble: { risePx: 0.8,  src: 'TPT CO2.cpp（重气体）/ 液体浮力，速度为本项目调参' },
+    // 干冰：TPT Weight 100 ⇒ 沉底；Loss 0 ⇒ 不会自己消失（只有遇水才剧烈冒雾）
+    dryice: { weight: 100, loss: 0, depositC: -78.5, sublimeC: -77.5, src: 'TPT DRIC.cpp + Sandboxels carbon_dioxide' },
+    // 冰受压会变成雪（TPT ICEI.cpp，本页没有冰，记着给别的配方用）
+    ice:    { crushPressure: 0.8, src: 'TPT ICEI.cpp' },
+  };
+  var CURVES = { late: 1.6, linear: 1.0, early: 0.6 };          // 压力曲线指数
+  // 像素网格：19 列 × 24 行，覆盖杯口到杯底以下（白气从杯沿溢出、往下淌、在台面摊开）
+  var GRID = { cols: 17, rows: 26, cw: 8, ch: 10,   // 列多了**不加控件**（一行还是 1 个），点更细
+            // ★★ 2026-10-01 口径对齐：用户说的 ● 是**文字字符**，不是圆图元 ——
+            //   一个文本框里放一串 ● ⇒ **一行只占 1 个控件**（与火焰用 ■ 同一招，省开销）。
+            //   用 ● 比 ░▒▓█ 更适合雾：**圆点本身就是"粒子"**。
+            //   浓度不靠字形深浅，靠**点的疏密**（有序抖动 / Bayer 4×4）⇒ 单字符也能表达渐变。
+            //   空档仍用 **U+3000**（全角，与 ●○ 等宽；普通空格会错位）。
+            dots: ['　', '○', '●'],   // 空 / 疏 / 密
+            bayer: [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5],   // 4×4 有序抖动矩阵
+            // 抖动阈值按**实测**定（实测密度：max 0.45 / 中位 0.044 / 90 分位 0.109）
+            //   [基准, 抖动幅度]：● 要密、○ 要疏
+            dotTone: { full: [0.050, 0.050], half: [0.012, 0.030] } };   // 实测多数格在 0.01~0.06 ⇒ 阈值必须更低
+  // ★ 2026-10-01：● 字符法扶正为默认（原粒子方案降为对照）
+  // ★ 2026-10-01 用户定：默认 = **烟（粒子）方案 + ● 字符渲染**（不是密度场）
+  var S = { whiteMode: 'dots', field: null, fieldT: 0, pxRows: null,
+            phase: 'A', hits: 0, done: false, squeeze: 0, pressure: 0, zoom: 1,
+            curve: 'late', bubble: false, dryice: false, swinging: false,
+            t: 0, fogs: [], bubbles: [], frost: [], pile: [], poolFx: [] };   // ★ 雾/气泡**逐粒**带位置与透明度（才能动、才能散）
+
+  function $(id){ return document.getElementById(id); }
+  function mk(cls, parent){ var d = document.createElement('div'); if (cls) d.className = cls; parent.appendChild(d); return d; }
+  function place(el, x, y, w, h){
+    el.style.width = w + 'px'; el.style.height = h + 'px';
+    el.style.transform = 'translate(-50%,-50%) translate(' + x + 'px,' + (-y) + 'px)';
+  }
+  var els = {}, fx = [], bodyBot = 0, bodyTop = 0, TAN = 0;
+  function halfInnerAt(t){ return CUP.baseW / 2 + (CUP.mouthW / 2 - CUP.baseW / 2) * t - CUP.inset; }
+  function pressureFor(hits){
+    var ratio = Math.max(0, Math.min(1, hits / TAPS));
+    return P_MAX * Math.pow(ratio, CURVES[S.curve]);
+  }
+  function squeezeFor(hits, phase){
+    // ★ 步长要小到**两阶段都不撞上限**：我第一版用 2%/下，A 阶段第 5 下就顶到 10%，
+    //   于是"最后一下没有变化"（测试立刻抓到）。现在 A 共 6%、B 再 3% ⇒ 合计 9%，全程单调。
+    var base = phase === 'B' ? 0.01 * TAPS : 0;                 // B 接着 A 的累计
+    return Math.min(0.10, base + (phase === 'B' ? 0.005 : 0.01) * hits);
+  }
+  // 自己的 LCG（千星禁 math.random ⇒ 抖动必须自己造）
+  var seed = 12345;
+  function rnd(){ seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; }
+
+  function build(){
+    var cup = $('cup'); cup.innerHTML = ''; fx = [];
+    var mouthW = CUP.mouthW, baseW = CUP.baseW, hh = CUP.h;
+    TAN = (mouthW - baseW) / 2 / hh;
+    bodyBot = -hh / 2; bodyTop = hh / 2;
+    var Hfull = (mouthW / 2) / TAN, Cb = (baseW / 2) / TAN;
+    var tri = mk('tri', cup); tri.setAttribute('data-k', 'bodyTri');
+    tri.style.background = 'rgba(224,240,255,.31)';
+    place(tri, 0, bodyTop - Hfull / 2, mouthW, Hfull);
+    var liq = mk('tri', cup); liq.setAttribute('data-k', 'liqTri'); els.liq = liq;
+    var top = mk('', cup); top.id = 'liqTop'; top.setAttribute('data-k', 'liqTop'); els.liqTop = top;
+    var mask = mk('mask', cup); mask.setAttribute('data-k', 'mask');
+    var mh = Cb + 0.1237 * Hfull + 8;
+    place(mask, 0, bodyBot + 0.6 - mh / 2, baseW + 4, mh);
+    els.halfInnerAt = halfInnerAt;
+    render();
+  }
+  function render(){
+    // 空杯（压缩阶段 fill=0，液面件全隐藏）
+    place(els.liq, 0, 0, 0, 0); place(els.liqTop, 0, 0, 0, 0);
+    // 挤压：横向压扁（杯子与锤子是两套件 ⇒ 只压 #cupWrap，不会带动锤子）
+    var w = $('cupWrap');
+    if (w && w.style) w.style.transform = 'scaleX(' + (1 - S.squeeze) + ')';
+    // 效果件
+    for (var i = 0; i < fx.length; i++) if (fx[i].remove) fx[i].remove();
+    fx = [];
+    function put(cls, x, y, ww, hh2, rot){
+      var el = mk(cls, $('cup')); fx.push(el); place(el, x, y, ww, hh2);
+      if (rot) el.style.transform += ' rotate(' + rot + 'deg)';
+      return el;
+    }
+    // 气泡：逐粒带"高度 + 速度"（会往上浮）
+    if (S.bubble && !S.dryice) {
+      if (!S.bubbles.length) for (var b = 0; b < 4; b++)
+        S.bubbles.push({ x: (b - 1.5) * 9, y: bodyBot + 12 + b * 10, el: put('bub', (b - 1.5) * 9, bodyBot + 12 + b * 10, 5, 5, 0) });
+      else for (var b2 = 0; b2 < S.bubbles.length; b2++)
+        S.bubbles[b2].el = put('bub', S.bubbles[b2].x, S.bubbles[b2].y, 5, 5, 0);
+    }
+    if (S.dryice) {
+      // ① 干冰堆：**按层序**画（底层先、上层后 ⇒ 上层盖住下层），逐块掉进来
+      if (!S.pile.length) for (var pc = 0; pc < PILE.length; pc++)
+        S.pile.push({ x: PILE[pc][0], y: PILE[pc][1], w: PILE[pc][2], h: PILE[pc][3], rot: PILE[pc][4], t: 0 });
+      for (var c = 0; c < S.pile.length; c++) {
+        var ch = S.pile[c];
+        if (ch.t <= 0.02) continue;                                    // 还没掉下来
+        var drop = (1 - ch.t) * 10;                                    // 从上方 10px 落下
+        var el4 = put('chunk', ch.x, bodyBot + ch.y + ch.h / 2 - drop, ch.w * ch.t, ch.h * ch.t, ch.rot);
+        if (el4 && el4.style) el4.style.opacity = Math.min(1, ch.t * 1.4).toFixed(2);
+      }
+      // 堆顶亮棱（最上面那块的头）
+      var topChunk = S.pile[S.pile.length - 1];
+      if (topChunk && topChunk.t > 0.6)
+        put('chunkTop', topChunk.x, bodyBot + topChunk.y + topChunk.h - 1, topChunk.w * 0.8, 3, topChunk.rot);
+      // ② 壁霜：从杯底往上 3 层，越往上越薄越淡（真的干冰会让杯壁结霜）
+      if (!S.frost.length) for (var w = 0; w < 3; w++)
+        S.frost.push({ t: 0, y0: bodyBot + 6 + w * 16, h: 15, a: 0.34 - w * 0.07 });
+      for (var w2 = 0; w2 < S.frost.length; w2++) {
+        var fr = S.frost[w2];
+        var el2 = put('frostwall', 0, fr.y0 + fr.h / 2, CUP.baseW + 6 - w2 * 3, fr.h * fr.t, 0);
+        fr.el = el2;                                                   // 存回模型：测试能验"真的画了"
+        if (el2 && el2.style) el2.style.opacity = (fr.a * fr.t).toFixed(2);   // t：结霜的铺开进度
+      }
+      put('frostrim', 0, bodyTop - 2, CUP.mouthW + 6, 4, 0);
+      // ③-a 字符白气：**一行 1 个文本框**
+      //     · 'dots'  = 烟（粒子）方案：把每片粒子吸附到格上（用户要的）
+      //     · 'pixel' = 密度场（备选）：逐格算密度再做有序抖动
+      if (S.whiteMode === 'dots' || S.whiteMode === 'pixel') {
+        if (S.whiteMode === 'pixel' && !S.field) S.field = makeField();
+        // ★★ 像素行**建一次、以后只改文字**。
+        //   我第一版每帧 mk() 新建 24 行、又没进 fx 回收表 ⇒ 每帧漏 24 个 div
+        //   （实测 83 帧后 DOM 里 1992 行）。手机上就是 1440 div/秒地堆。
+        if (!S.pxRows) {
+          S.pxRows = [];
+          for (var pr = 0; pr < GRID.rows; pr++) {
+            var rowEl = mk('pxRow', $('cup')); rowEl.setAttribute('data-k', 'pxRow');
+            var py = bodyTop + 8 - pr * GRID.ch;                        // 从杯口往下排（间距 = 格高）
+            if (rowEl.style) {
+              // ★ 字号**就等于格宽**：全角字符的步进≈字号 ⇒ 这样字符才跟格对齐。
+              //   我上一版写了 ×1.25 ⇒ 整串比网格宽 25%，点阵跟密度场对不上。
+              rowEl.style.fontSize = GRID.cw.toFixed(1) + 'px';
+              rowEl.style.lineHeight = GRID.ch.toFixed(1) + 'px';
+              rowEl.style.transform = 'translate(-50%,-50%) translate(0px,' + (-py).toFixed(1) + 'px)';
+              rowEl.style.opacity = (0.92 - pr * 0.012).toFixed(2);       // 越往下越淡（散掉）
+            }
+            S.pxRows.push(rowEl);
+          }
+        }
+        var texts = (S.whiteMode === 'dots') ? particleCells() : null;
+        for (var pr2 = 0; pr2 < S.pxRows.length; pr2++) S.pxRows[pr2].textContent = texts ? texts[pr2] : fieldText(pr2);
+      } else if (S.pxRows) {
+        // 切回圆片法：把像素行拆掉（不能留着占 DOM）
+        for (var pr3 = 0; pr3 < S.pxRows.length; pr3++) if (S.pxRows[pr3].remove) S.pxRows[pr3].remove();
+        S.pxRows = null;
+      }
+      // ③-b 白气碎絮（圆片法）：从**杯沿两侧**溢出、往下淌；每片大小/旋角/速度/透明度都不一样
+      var F = SUBST.fog;
+      var nWant = (S.whiteMode === 'dots') ? F.wispsDots : F.wisps;
+      if (!S.fogs.length) for (var f = 0; f < nWant; f++) S.fogs.push(newWisp(f));
+      for (var f2 = 0; S.whiteMode === 'circle' && f2 < S.fogs.length; f2++) {
+        var fo = S.fogs[f2];
+        var el3 = put('wisp', fo.x, fo.y, fo.w, fo.h, fo.rot);
+        fo.el = el3;
+        // 杯内的白气隔着杯壁看 ⇒ 再虚一档
+        var a = fo.life * F.wispA * (fo.phase === 'in' ? 0.7 : 1) * (fo.alphaMul || F.layerAlpha[fo.layer || 0]);
+        if (el3 && el3.style) el3.style.opacity = Math.max(0, Math.min(1, a)).toFixed(2);
+      }
+      // ④ 雾滩：杯子下面几片**扁的**（干冰雾沉到台面上），也是碎片拼的
+      if (S.whiteMode === 'circle' && !S.poolFx.length) for (var p2 = 0; p2 < 4; p2++)
+        S.poolFx.push({ x: [-30, -4, 20, 34][p2], y: -30 - p2 * 4, w: [70, 92, 64, 44][p2], h: [11, 14, 10, 8][p2], a: [0.30, 0.22, 0.26, 0.20][p2] });
+      for (var p3 = 0; S.whiteMode === 'circle' && p3 < S.poolFx.length; p3++) {
+        var pf = S.poolFx[p3];
+        var elp = put('fogpool', pf.x, bodyBot + pf.y, pf.w, pf.h, 0);
+        if (elp && elp.style) elp.style.opacity = (pf.a * Math.min(1, S.t / 1.0)).toFixed(2);
+      }
+    }
+    var sc = $('scene'); if (sc && sc.style) sc.style.setProperty('--zoom', S.zoom);
+  }
+  function readout(){
+    if ($('roP')) $('roP').textContent = Math.round(S.pressure).toLocaleString();
+    if ($('roPhase')) $('roPhase').textContent = S.phase === 'A' ? 'A 压缩至 25000 千帕' : (S.done ? '完成' : 'B 压至固态干冰');
+    if ($('roHits')) $('roHits').textContent = S.hits + '/' + TAPS;
+    if ($('roSqueeze')) $('roSqueeze').textContent = Math.round(S.squeeze * 100) + '%';
+    if ($('roState')) $('roState').textContent = (S.dryice ? '固态干冰' : (S.bubble ? '气泡' : '空气'));
+    if ($('roCupCount')) $('roCupCount').textContent = '5（外锥+液锥+液面线+遮挡+根）';
+    if ($('roFxCount')) $('roFxCount').textContent = (S.dryice ? '冰堆最多 11 块 + 顶棱1 + 壁霜3 + 口霜1 + 雾瀑3 + 雾滩1' : (S.bubble ? '4（气泡）' : '0'));
+    if ($('roZoom')) $('roZoom').textContent = '×' + S.zoom.toFixed(2);
+    if ($('roPhaseC')) $('roPhaseC').textContent = 'CO₂→干冰 ' + SUBST.dryice.depositC + '℃ / 干冰→CO₂ ' + SUBST.dryice.sublimeC + '℃（TPT+Sandboxels 两处一致）';
+    if ($('roPart')) $('roPart').textContent = S.fogs.length + ' / ' + S.bubbles.length;
+    if ($('roWmCount')) $('roWmCount').textContent = (S.whiteMode === 'dots')
+      ? (GRID.rows + ' 行文本（每片粒子吸附到格上；同行共用一个文本框 ⇒ 一行 1 控件）')
+      : (S.whiteMode === 'pixel')
+      ? GRID.rows + ' 行文本（' + GRID.cols + '×' + GRID.rows + ' 格 · 一行 1 控件；字符 ' + GRID.dots[2] + GRID.dots[1] + ' + U+3000 抖动）'
+      : SUBST.fog.wisps + ' 个椭圆 + ' + S.poolFx.length + ' 雾滩';
+    if ($('roCurve')) {
+      var vals = [];
+      for (var i = 1; i <= TAPS; i++) vals.push(Math.round(P_MAX * Math.pow(i / TAPS, CURVES[S.curve])).toLocaleString());
+      $('roCurve').textContent = vals.join(' → ');
+    }
+  }
+  // ★ 按**物性表**推进一帧（雾上飘 + 按寿命淡出并在杯口重生；气泡上浮到液面就回到杯底）
+  function step(ms){
+    var dt = (ms || 33) / 1000;
+    S.t = S.t + dt;
+    if (S.dryice) {
+      // 干冰：**逐块掉进来**（每块间隔一点时间 ⇒ 有"堆起来"的过程，不是瞬间出现）
+      for (var pc2 = 0; pc2 < S.pile.length; pc2++) {
+        var ch2 = S.pile[pc2];
+        var want = Math.max(0, Math.min(1, (S.t - 0.05 - pc2 * 0.06) / 0.16));
+        if (ch2.t < want) ch2.t = want;
+      }
+      // 结霜：3 层依次铺开（t 从 0 到 1）
+      for (var s = 0; s < S.frost.length; s++) {
+        var fr = S.frost[s];
+        if (fr.t < 1) fr.t = Math.min(1, fr.t + dt * (1.2 - s * 0.25));   // 下层先结、上层后结
+      }
+      var F = SUBST.fog;                       // ★ step 里也要这个别名（我第一版只在 render 里定义过，于是 F is not defined）
+      if (S.whiteMode === 'pixel') { fieldStep(dt); }      // 像素法：只推进密度场
+      for (var i = 0; (S.whiteMode === 'circle' || S.whiteMode === 'dots') && i < S.fogs.length; i++) {
+        var f = S.fogs[i];
+        if (f.phase === 'in') {
+          // ① 杯内：从冰上**往上顶**，被杯壁收着（不许穿出内壁），逐渐显形
+          f.y = f.y + F.risePx * dt * 60;
+          var tt = Math.max(0, Math.min(1, (f.y - bodyBot) / CUP.h));
+          var lim = Math.max(6, halfInnerAt(tt) - 6);
+          f.baseX = f.baseX + f.drift * 0.25 * dt * 60;
+          f.x = f.baseX + Math.sin(S.t * f.hz * Math.PI * 2 + f.ph) * f.amp * 0.5;  // 杯里也在飘（幅度减半）
+          if (Math.abs(f.x) > lim) { f.x = (f.x < 0 ? -1 : 1) * lim; f.baseX = f.x; }  // ★ 被杯壁挡住
+          f.life = Math.min(1, f.life + dt * 1.6);
+          if (f.y >= bodyTop - 5) {                                          // 装满了 ⇒ 溢过杯沿
+            f.phase = 'over';
+            f.y = bodyTop - 3;
+            f.x = f.side * (CUP.mouthW / 2 - 5);
+          }
+        } else if (f.phase === 'over') {
+          // ② 杯沿：往外爬一点点，越过杯口边就进入下落段
+          f.y = f.y + F.risePx * 0.25 * dt * 60;
+          f.x = f.x + f.side * F.overSpeed * dt * 60;   // 慢 ⇒ 杯沿多停，形成浓罩
+          if (Math.abs(f.x) >= CUP.mouthW / 2 + 6) f.phase = 'out';
+        } else {
+          // ③ 杯外：**飘**（左右慢摆 = "飘动的雾气"的核心）+ 缓缓下沉 + 边散边转
+          f.y = f.y + F.dir * f.fall * dt * 60;
+          f.baseX = f.baseX + f.drift * dt * 60;                               // 整体慢慢漂（风）
+          f.x = f.baseX + Math.sin(S.t * f.hz * Math.PI * 2 + f.ph) * f.amp;   // ★ 左右摆动
+          var wCap = F.wispWMax * (f.halo ? F.haloScale : 1);                                 // 晕可以更大
+          if (f.w < wCap) f.w = Math.min(wCap, f.w + f.grow * dt * 60);                       // 有上限：不许长成"大卡片"
+          f.rot = f.rot + Math.sin(S.t * f.hz * 2 + f.ph) * 0.6 * dt * 60;
+          f.life = f.life - F.fadePerSec * dt * (1 - f.layer * 0.15);
+          if (f.life <= 0 || f.y < bodyBot - 40) {
+            var fresh = newWisp(i);                                          // 回杯底重新来一遍
+            for (var k in fresh) if (k !== 'side' && k !== 'el') f[k] = fresh[k];
+          }
+        }
+        // 位置/透明度都交给 render() 画，这里只改模型（两处各自画 = 早晚打架）
+      }
+    }
+    if (S.bubble) {
+      for (var b = 0; b < S.bubbles.length; b++) {
+        var bb = S.bubbles[b];
+        bb.y = bb.y + SUBST.bubble.risePx * dt * 60;            // 上浮
+        if (bb.y > bodyTop - 10) { bb.y = bodyBot + 8; bb.x = (rnd() - 0.5) * 30; }
+      }
+    }
+    // ★★ 2026-10-01 修的 bug：**模型变了必须重画**。
+    //   上一版 step() 只改模型（冰堆的 t 涨到 1），而画冰堆/结霜的活儿在 render() 里，
+    //   render() 又只由 press()/load() 调用 ⇒ 屏幕上冰堆压根没出现（模型对、DOM 不动）。
+    //   单职责分法：step() 改模型 → render() 画；**不许有两处各自画**。
+    render();
+    return { t: S.t, fogs: S.fogs.length, bubbles: S.bubbles.length };
+  }
+  // 一片白气：从杯沿某一侧溢出。side 交替 ⇒ 左右都冒；参数错开 ⇒ 不成一根柱子
+  // 一片白气：带**相位**（'in' 杯内上升 / 'over' 溢过杯沿 / 'out' 沿外壁下落）
+  //   初始把 14 片铺在整条路径上（否则一开始全挤在杯底，看着像"杯底在冒泡"）
+  function newWisp(i){
+    var F = SUBST.fog;
+    var dotMode = (S.whiteMode === 'dots');
+    var nW = dotMode ? F.wispsDots : F.wisps;         // ★ 字符模式粒子多 3 倍（不加控件）
+    var rw = F.wispW[1] - F.wispW[0], rh = F.wispH[1] - F.wispH[0], rd = F.driftPx[1] - F.driftPx[0];
+    var side = (i % 2 === 0) ? -1 : 1;
+    var layer = i % F.layers;                       // ★ 视差分层：0=近（大/快/浓），2=远（小/慢/淡）
+    var isHalo = (i % F.haloEvery === 0);           // ★ 三分之一做"晕"（大、极淡、慢）
+    var sc2 = (isHalo ? F.haloScale : 1) * F.layerSize[layer];
+    var a2 = (isHalo ? F.haloAlpha : 1) * F.layerAlpha[layer];
+    var v2 = (isHalo ? F.haloSpeed : 1) * F.layerSpeed[layer];
+    var w = {
+      side: side,
+      layer: layer,
+      halo: isHalo,
+      alphaMul: a2,
+      w: (F.wispW[0] + rnd() * rw) * sc2 * (dotMode ? 0.6 : 1),
+      h: (F.wispH[0] + rnd() * rh) * sc2,
+      rot: (rnd() - 0.5) * 26,
+      // 摆动（飘）：幅度/频率/初相各自不同 ⇒ 不会整齐划一地摆
+      amp: F.driftAmp[0] + rnd() * (F.driftAmp[1] - F.driftAmp[0]),
+      hz: F.driftHz[0] + rnd() * (F.driftHz[1] - F.driftHz[0]),
+      ph: rnd() * Math.PI * 2,
+      baseX: 0,
+      drift: side * (F.driftPx[0] + rnd() * rd) * v2,
+      fall: F.fallPx * (0.75 + rnd() * 0.6) * v2,
+      grow: (0.06 + rnd() * 0.10) * sc2,
+      life: 1,
+    };
+    if (i % 4 === 3) {                       // 四分之一初始就在杯外（下落中）
+      w.phase = 'out';
+      // ★ 字符模式粒子多（90 片）⇒ 让一部分从**杯口中间**出来，把羽流填满
+      //   （只从两侧出的话，中间会留一条竖缝）
+      w.x = dotMode && (i % 12 === 3)
+        ? (rnd() - 0.5) * CUP.mouthW * 0.8
+        : side * (CUP.mouthW / 2 + 4 + rnd() * 20);
+      w.y = bodyTop - 24 - rnd() * 34;
+    } else {                                 // 其余在杯内，沿高度铺开
+      w.phase = 'in';
+      var tt = 0.10 + (i / nW) * 0.82;
+      w.y = bodyBot + tt * CUP.h;
+      w.x = side * Math.max(6, halfInnerAt(tt) - 6 - rnd() * 6);
+      w.life = 0.35 + rnd() * 0.4;           // 杯内从淡到显（刚生成时还不实）
+    }
+    if (w.baseX === 0) w.baseX = w.x;        // 摆动绕这个位置（"飘"是绕着走，不是一路平移）
+    return w;
+  }
+  // ── 像素白气：一个**字符密度场**（不是逐像素，而是逐格算密度、逐行拼字符）──
+  function makeField(){
+    var f = [];
+    for (var j = 0; j < GRID.rows; j++) { var row = []; for (var i = 0; i < GRID.cols; i++) row.push(0); f.push(row); }
+    return f;
+  }
+  // ── 值噪声（确定性；千星禁 math.random，这里也不许用）──
+  //   思路借自 Sandboxels 仓库自带的 scripts/perlin.js：**用平滑噪声驱动流场**，
+  //   密度才会"成丝、有缝、会飘"；上一版只有下沉+扩散 ⇒ 铺成一堵字符墙。
+  function vhash(a, b){
+    var n = (a | 0) * 374761393 + (b | 0) * 668265263;
+    n = (n ^ (n >> 13)) * 1274126177;
+    return ((n ^ (n >> 16)) >>> 0) / 4294967295;
+  }
+  function vnoise(x, y){
+    var xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+    var u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+    return (vhash(xi, yi) * (1 - u) + vhash(xi + 1, yi) * u) * (1 - v)
+         + (vhash(xi, yi + 1) * (1 - u) + vhash(xi + 1, yi + 1) * u) * v;
+  }
+  // 横向流场：随空间与**时间**缓慢变化 ⇒ 雾会左右飘、柱子会蜿蜒分叉
+  function flowX(c, j, t){
+    // ★ 必须**分开两件事**（我上一版只用了噪声，实测在采样区全是负值 ⇒ 流向从不反，那就不叫"飘"）：
+    //   ① **全局摆动** sway：所有格一起左右摆（像风）⇒ 保证"来回"；周期约 5.7 秒
+    //   ② **局部噪声** noise：让雾柱成丝、有缝、会变形
+    var sway = Math.sin(t * 1.1 + c * 0.12) * 0.85;
+    var nz = (vnoise(c * 0.26 + t * 0.55, j * 0.20 - t * 0.22) - 0.5) * 1.6;
+    var mid = (GRID.cols - 1) / 2, d = c - mid;
+    var back = (Math.abs(d) > 5) ? -Math.sign(d) * 0.55 * (Math.abs(d) - 5) : 0;   // 边界回推
+    return sway + nz + back;
+  }
+  function fieldStep(dt){
+    if (!S.field) S.field = makeField();
+    var f = S.field, cols = GRID.cols, rows = GRID.rows;
+    S.fieldT = S.fieldT + dt;
+    var t = S.fieldT;
+    var nxt = makeField();
+    // ① 源：**只从杯口那几列**冒（上一版源横跨整行 ⇒ 铺成一堵墙）
+    var mid = (cols - 1) / 2;
+    for (var i = 0; i < cols; i++) {
+      var dx = Math.abs(i - mid);
+      if (dx > 3.0) continue;
+      var wob = 0.6 + 0.8 * vnoise(i * 0.5 + t * 0.6, t * 0.3);      // 源本身也在抖 ⇒ 不是一条直线
+      nxt[0][i] = Math.min(1.2, nxt[0][i] + 2.6 * dt * (1 - dx / 3.5) * wob);
+    }
+    // ② 输运：**横向漂移为主**（"飘"）+ 缓缓下沉 + 少量扩散
+    for (var j = 0; j < rows; j++) {
+      for (var c = 0; c < cols; c++) {
+        var v = f[j][c];
+        if (v <= 0.002) continue;
+        var push = flowX(c, j, t);                                    // 横向流（可正可负）
+        var c0 = c + push * 0.50;
+        var cf = Math.floor(c0), fr = c0 - cf;
+        var cA = Math.max(0, Math.min(cols - 1, cf));
+        var cB = Math.max(0, Math.min(cols - 1, cf + 1));
+        var dwn = (j + 1 < rows) ? j + 1 : j;
+        // ★ 权重必须**加起来≈1**：我第一版 0.26+0.30+0.12=0.68 ⇒ 每帧丢 32%，
+        //   雾只活了两行（实测只有 3% 的格子有雾）。
+        nxt[dwn][cA] += v * 0.30 * (1 - fr);                          // 下沉（带横向偏移）
+        nxt[dwn][cB] += v * 0.30 * fr;
+        nxt[j][cA] += v * 0.45 * (1 - fr);                            // ★ 留在同一行、横向漂（"飘动的雾气"的主力）
+        nxt[j][cB] += v * 0.45 * fr;
+        nxt[j][c] += v * 0.22;                                        // 悬停的一部分
+      }
+    }
+    var decay = Math.exp(-0.42 * dt);                                 // 会散（TPT FOG 的"有寿命"）
+    for (var j2 = 0; j2 < rows; j2++)
+      for (var c2 = 0; c2 < cols; c2++) nxt[j2][c2] = Math.min(1.2, nxt[j2][c2] * decay);
+    S.field = nxt;
+  }
+  // 密度 → 字符：两级（○ 疏 / ● 密）各自带**抖动阈值** ⇒ 单字符也能表现渐变
+  function shadeOf(v, i, j){
+    var b = (i === undefined) ? 0 : GRID.bayer[((j | 0) % 4) * 4 + ((i | 0) % 4)] / 16;   // 0..0.9375
+    if (v <= 0.001) return GRID.dots[0];
+    var T = GRID.dotTone;
+    if (v > T.full[0] + b * T.full[1]) return GRID.dots[2];   // 密 ⇒ ●
+    if (v > T.half[0] + b * T.half[1]) return GRID.dots[1];   // 疏 ⇒ ○
+    return GRID.dots[0];
+  }
+  // ★★ 粒子 → 字符格：**烟方案（粒子）用 ● 字符画**（2026-10-01 用户要的）
+  //   每片白气有自己的位置/大小/寿命/摆动（这就是"烟"），渲染时把它**吸附到最近的格**，
+  //   同一行的粒子拼进**同一个文本框** ⇒ 一行 1 个控件（省开销），但画面上仍是"一片一片的粒子"。
+  //   字形承担"轻重"：近的/亮的用 ●，远的/晕的/将散的用 ○。
+  function particleCells(){
+    var g = [], rows = GRID.rows, cols = GRID.cols;
+    for (var j = 0; j < rows; j++) { var r = []; for (var i = 0; i < cols; i++) r.push(GRID.dots[0]); g.push(r); }
+    for (var k = 0; k < S.fogs.length; k++) {
+      var f = S.fogs[k];
+      if (f.phase === 'in' && f.life < 0.12) continue;                 // 杯里刚生成的先不显
+      var jj = Math.round((bodyTop + 8 - f.y) / GRID.ch);              // 行
+      var ii = Math.round((f.x + cols * GRID.cw / 2) / GRID.cw);       // 列
+      if (jj < 0 || jj >= rows || ii < 0 || ii >= cols) continue;      // 出格的不画
+      var ch = (!f.halo && f.life > 0.5) ? GRID.dots[2] : GRID.dots[1];// ● 亮/近、○ 淡/远
+      if (g[jj][ii] === GRID.dots[0] || ch === GRID.dots[2]) g[jj][ii] = ch;   // 同格取重的那个
+    }
+    var out = [];
+    for (var j2 = 0; j2 < rows; j2++) out.push(g[j2].join(''));
+    return out;
+  }
+  function particlesText(j){ return particleCells()[j]; }
+  function fieldText(j){
+    var s = '';
+    for (var i = 0; i < GRID.cols; i++) s += shadeOf(S.field ? S.field[j][i] : 0, i, j);
+    return s;
+  }
+  function fieldMass(){
+    if (!S.field) return 0;
+    var m = 0;
+    for (var j = 0; j < GRID.rows; j++) for (var i = 0; i < GRID.cols; i++) m += S.field[j][i];
+    return m;
+  }
+  function pulse(sel, cls){ var e = $(sel); if (!e || !e.classList) return; e.classList.remove(cls); void (e.offsetWidth); e.classList.add(cls); }
+  function jitter(){ return (rnd() - 0.5) * (2 + S.hits * 0.6); }     // 抖动幅度随进度加大
+
+  function press(){
+    if (S.done) { readout(); return { ignored: true }; }
+    S.hits++; S.swinging = true;
+    S.squeeze = squeezeFor(S.hits, S.phase);
+    S.pressure = S.phase === 'A' ? pressureFor(S.hits) : P_MAX + pressureFor(S.hits);
+    if ($('hmWrap') && $('hmWrap').style)
+      $('hmWrap').style.transform = 'translateX(-50%) translate(' + jitter().toFixed(1) + 'px,0)';
+    pulse('hmWrap', 'plunge');
+    if (S.hits >= TAPS) {
+      if (S.phase === 'A') { S.bubble = true; S.phase = 'B'; }
+      else { S.dryice = true; S.done = true; pulse('flash', 'on'); }
+      S.hits = 0; S.pressure = S.phase === 'A' ? 0 : P_MAX;
+      render(); readout();
+      return { phase: S.phase, done: S.done, bubble: S.bubble, dryice: S.dryice };
+    }
+    render(); readout();
+    if (typeof setTimeout === 'function') setTimeout(function(){ S.swinging = false; }, 240);
+    return { phase: S.phase, hits: S.hits, pressure: S.pressure, squeeze: S.squeeze };
+  }
+  function load(){
+    S.phase = 'A'; S.hits = 0; S.done = false; S.squeeze = 0; S.pressure = 0;
+    S.bubble = false; S.dryice = false; S.swinging = false;
+    S.t = 0; S.fogs = []; S.bubbles = []; S.frost = []; S.pile = []; S.poolFx = []; S.field = null; S.fieldT = 0;
+    if (S.pxRows) { for (var pr4 = 0; pr4 < S.pxRows.length; pr4++) if (S.pxRows[pr4].remove) S.pxRows[pr4].remove(); S.pxRows = null; }
+    var hm = $('hmWrap'); if (hm && hm.style) hm.style.transform = 'translateX(-50%)';
+    render(); readout(); return S;
+  }
+  function setZoom(z){ S.zoom = Math.max(0.6, Math.min(1.6, z)); var r = $('rZoom'); if (r) r.value = S.zoom; render(); readout(); }
+  function setCurve(c){ if (CURVES[c] != null) { S.curve = c; render(); readout(); } }
+  function setWhiteMode(m){
+    S.whiteMode = (m === 'pixel') ? 'pixel' : (m === 'dots' ? 'dots' : 'circle');
+    S.field = null; S.fieldT = 0;
+    S.fogs = []; S.bubbles = []; S.frost = []; S.pile = []; S.poolFx = [];   // ★ 换模式要重建（粒子数不同）
+    render(); readout(); return S.whiteMode;
+  }
+  function fieldOf(j){ var out = []; for (var i = 0; i < GRID.cols; i++) out.push(S.field ? S.field[j][i] : 0); return out; }
+  function fieldTotal(){ return fieldMass(); }
+  function rowOfMass(){                       // 密度重心在第几行（用来验"往下走"）
+    if (!S.field) return 0;
+    var num = 0, den = 0;
+    for (var j = 0; j < GRID.rows; j++) for (var i = 0; i < GRID.cols; i++) { num += j * S.field[j][i]; den += S.field[j][i]; }
+    return den > 0 ? num / den : 0;
+  }
+  return {
+    CUP: CUP, HM: HM, TAPS: TAPS, P_MAX: P_MAX, CURVES: CURVES, state: S,
+    build: build, render: render, readout: readout, press: press, load: load, setZoom: setZoom, setCurve: setCurve,
+    pressureFor: pressureFor, squeezeFor: squeezeFor, SUBST: SUBST, step: step, PILE: PILE,
+    GRID: GRID, setWhiteMode: setWhiteMode, shadeOf: shadeOf, fieldText: fieldText, flowX: flowX,
+    dots: function(){ return GRID.dots; }, bayer: function(){ return GRID.bayer; },
+    field: fieldOf, fieldTotal: fieldTotal, rowOfMass: rowOfMass,
+    wispControls: function(){ return (S.whiteMode === 'circle') ? (S.fogs.length + S.poolFx.length) : GRID.rows; },   // ★ 字符模式(pixel/dots)的控件数 = 行数
+    fxCount: function(){
+      if (!S.dryice) return S.bubble ? 4 : 0;
+      var wc = (S.whiteMode === 'circle') ? S.fogs.length : GRID.rows;   // ★ 字符模式：控件 = 行数，不是粒子数
+      return S.pile.filter(function(c){ return c.t > 0.02; }).length + 1 + 3 + wc + S.poolFx.length;
+    },
+    cupCount: function(){ return 5; },
+    hammerCount: function(){ return 2; },
+  };
+})();
+
+/* ---------------------------- 接线 ---------------------------- */
+(function(){
+  if (typeof document === 'undefined' || !document.getElementById) return;
+  var $ = function(id){ return document.getElementById(id); };
+  function hit(){ DRY.press(); }
+  $('btnHit').addEventListener('click', hit);
+  $('btnReset').addEventListener('click', function(){ DRY.load(); });
+  $('rZoom').addEventListener('input', function(e){ DRY.setZoom(parseFloat(e.target.value)); });
+  $('btnFit').addEventListener('click', function(){
+    var st = $('stage'); var avail = (st.getBoundingClientRect ? st.getBoundingClientRect().height : 400) - 60;
+    DRY.setZoom(Math.max(0.6, Math.min(1.6, avail / DRY.CUP.h)));
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-whitemode]'), function(b){
+    b.addEventListener('click', function(){
+      DRY.setWhiteMode(b.getAttribute('data-whitemode'));
+      Array.prototype.forEach.call(document.querySelectorAll('[data-whitemode]'), function(x){ x.classList.toggle('on', x === b); });
+    });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-curve]'), function(b){
+    b.addEventListener('click', function(){
+      DRY.setCurve(b.getAttribute('data-curve'));
+      Array.prototype.forEach.call(document.querySelectorAll('[data-curve]'), function(x){ x.classList.toggle('on', x === b); });
+    });
+  });
+  if (document.addEventListener) document.addEventListener('keydown', function(e){
+    if (e.repeat) return;
+    if (e.key === ' ' || e.key === 'Enter' || e.key === 'j' || e.key === 'J') { e.preventDefault(); hit(); }
+  });
+  DRY.build(); DRY.load(); DRY.setZoom(1);
+  // 动画驱动：雾/气泡按物性表逐帧推进（千星侧等价于 OnUpdate(dt)）
+  if (typeof setInterval === 'function') setInterval(function(){ DRY.step(33); }, 33);
+  window.DRY_HIT = hit;
+  window.DRY_LOAD = function(){ return DRY.load(); };
+  window.DRY_CURVE = function(c){ return DRY.setCurve(c); };
+  window.DRY_ZOOM = function(z){ return DRY.setZoom(z); };
+})();
+</script>
+</body>
+</html>

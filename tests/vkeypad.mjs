@@ -257,5 +257,14 @@ if (ALIGN && GAP_APPLY && els.alignRange && els.fireWrap) {
   chk(!/margin-bottom:-6px/.test(rule), '静态：旧的"压进筒口 6px"写法已不存在');
 } else { chk(false, '页面暴露了对齐测试缝'); }
 
+/* ⑮ 视觉件必须都有样式（同 ⑩：建出来没上色 = 看不见，测试全绿、屏幕空白） */
+{
+  const css = styles.slice(0, styles.indexOf('@keyframes') >= 0 ? styles.indexOf('@keyframes') : styles.length);
+  const need = ['#mouth', '#inner', '#grip', '#tri', '#shine', '#fireWrap', '.charlayer', '#prop'];
+  const missing = need.filter(sel => !new RegExp(sel.replace('.', '\\.') + '\\s*[,{]').test(styles));
+  if (missing.length) console.log('      缺样式的选择器：' + missing.join(' '));
+  chk(missing.length === 0, `炮筒页所有视觉件在 CSS 里都有规则（${need.length} 个）`);
+}
+
 console.log(bad ? `\n微量测试：${bad} 项失败` : '\n微量测试：全部通过 ✓');
 process.exit(bad ? 1 : 0);

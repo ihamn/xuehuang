@@ -22,17 +22,32 @@ local P = {}
 -- ══════════════════════════════════════════════════════════
 P.spec = {
   cup = {
-    slopeDeg = 8.75,        -- 侧壁离垂直的角度（基准数）
-    h        = 100,         -- 杯身高
-    -- ★ 两个明确命名的口径（2026-09-27 定稿）：**上宽下窄**
-    --   上 = 杯口/口径（看得见的那头，宽）；下 = 杯底（收进去的那头，窄）。
-    --   要改方向就改这两个值 —— 不许再用 "wTop 减点东西" 那种推法（我因此反了 3 次）。
-    mouthW   = 100,         -- 杯口（上，宽）
+    -- ★★ 2026-10-01 用户在网页原型上圈定：**口径 100 · 底径 69.2 · 杯高 198**（斜率 4.40°）
+    --   即"更高更直的直筒杯"（原稿是 100 高 / 8.75°）。
+    --   ★ 这三个是**主量**，斜率由它们推出（见 P.cupSlopeDeg）——
+    --     反过来写（改杯高忘了改斜率）会得到一只形状不对的杯子。
+    mouthW   = 100,         -- 杯口（上，宽）★ 主量
+    baseW    = 69.2,        -- 杯底（下，窄）★ 主量（原来是"由 slopeDeg 推"，现在反过来）
+    h        = 198,         -- 杯身高 ★ 主量
+    slopeDeg = 4.45,        -- 由上面三个推出（198 高 ⇒ atan(15.4/198)=4.45°；测试断言它与主量一致）
+    baseRimH = 2,           -- 杯底亮边高（0 = 不画）
+    -- 三角方案的"尖端留白"补偿：千星三角图元转 180° 后，尖点比控件框**多伸一段**。
+    --   P.cone 实测：三角高 ~194 时多伸 24 ⇒ 比例 0.1237。
+    --   杯子这个三角高得多（口径 100/4.40° ⇒ 全锥高 650），留白是固定值还是按比例
+    --   **只能真机标定**（模拟器不模拟图元留白）。标定前先用这个比例算，宁可盖多不盖少。
+    tipPadRatio = 24 / 194,
+    mode     = 'tri',       -- 'tri' = 三角形+遮挡（默认） / 'band' = 叠条（兜底，32 条）
     wTop     = 100,         -- 旧名，保留兼容；语义等同 mouthW
-    inset    = 3,           -- 内壁相对外壁内缩（液体裁切用）
+    inset    = 3,           -- 内壁相对外壁内缩
     lipH     = 8,           -- 杯口亮边高
     shineW   = 4,           -- 高光宽
   },
+  -- 画布底色（遮挡块常用的"背后颜色"；道具挂在卡片上时要换成卡片色）
+  MASK_CANVAS = { 10, 14, 24 },
+  -- 柠檬锤尺寸（设计像素；与杯子同一套 ⇒ 相对大小由结构保证）
+  --   锤头 62 / 杯口 100 = 62%：能进杯口，又不至于细得像筷子
+  --   杆长 150：插到底（行程 210）时杆仍露在杯口外面
+  hammer = { head = { w = 62, h = 16 }, stem = { w = 14, h = 150 }, gap = 22, plunge = 210 },
   cone = {
     -- ★ 2026-10-01 用户在网页原型上圈定（预设"火炬·细高"）：
     --   造型要求"更细、更陡、整体更小"，且整支点着后要像**火炬**（见 qilin 注释第 ⑤ 层）。
@@ -116,11 +131,20 @@ end
 -- 杯底宽（由斜率算出来，不手填）
 function P.cupBottomWidth(s)
   s = s or P.spec.cup
-  return s.wTop - 2 * P.slopeRun(s.h, s.slopeDeg)
+  if s.baseW then return s.baseW end                    -- ★ 主量优先
+  return (s.wTop or s.mouthW) - 2 * P.slopeRun(s.h, s.slopeDeg or P.cupSlopeDeg(s))
+end
+
+-- ★ 斜率由三个主量推出（口径/底径/杯高）——改杯高忘了改斜率的坑就堵在这里
+function P.cupSlopeDeg(s)
+  s = s or P.spec.cup
+  local run = ((s.mouthW or s.wTop) - P.cupBottomWidth(s)) / 2
+  if run <= 0 or s.h <= 0 then return 0 end
+  return math.atan(run / s.h) * 180 / math.pi
 end
 
 -- ══════════════════════════════════════════════════════════
--- 四、杯子：**叠条法**逼近网页稿的梯形玻璃杯
+-- 四-A、杯子：**叠条法**（兜底方案）逼近网页稿的梯形玻璃杯
 --
 -- ★★ 为什么必须"叠条"（这是"和网页一样"的唯一路子）：
 --   网页稿（SVG）用的是「多边形 + 描边 + 半透明填充 + 渐变 + 裁切」。
@@ -133,7 +157,7 @@ end
 --   有 cupArt 时本体直接贴图，这里只画"液体 + 进度"。官方没给素材号一览表，
 --   哪个号是杯子只能你在编辑器里挑（我没法凭猜写一个号 —— 假素材号会显示成空白）。
 -- ══════════════════════════════════════════════════════════
-function P.cup(cfg, name, x, y, drink)
+function P.cupBands(cfg, name, x, y, drink)
   local s = P.spec.cup
   local root = H.spawn(cfg, 'img', name or 'CupRoot')
   H.setPos(root, x or 0, y or 0)
@@ -236,6 +260,489 @@ function P.cup(cfg, name, x, y, drink)
   return { root = root, liq = liqBands[1], setFill = setFill, lip = lip, shine = shine,
            mouthW = mouthW, baseW = baseW, bands = BANDS + LQ + 1,
            geo = { h = hh, mouth = mouthW, base = baseW, inset = s.inset, slopeDeg = s.slopeDeg } }
+end
+
+-- ══════════════════════════════════════════════════════════
+-- 四-D、柠檬锤：**T 形 = 锤头（横，在下）+ 锤杆（竖，在上）两个方块**
+--   ★ 方向：**锤头在下**（倒 T）—— 真正的捣锤就是这样；上一版我放在上面，用户报"放反了"。
+--   ★ 尺寸以**杯子的设计像素**为准（锤头 62 能进 100 的杯口 = 62%，杆长 150 插到底还露在外面）：
+--     两者用同一套设计像素、同一个缩放 ⇒ "大小匹配"是结构保证的，不靠记数字。
+--   ★ 动作：**垂直下锤**（不是绕顶端摆）—— 捣锤本来就是这么用的，
+--     顺带省掉"枢轴容器"（千星的旋转绕控件中心，想绕顶端转就得多挂一层）。
+function P.lemonHammer(cfg, name, x, y, opts)
+  opts = opts or {}
+  local HM = P.spec.hammer
+  local sc = opts.scale or 1
+  local nm = name or 'Hammer'
+  local root = H.spawn(cfg, 'img', nm .. 'Root')
+  H.setSize(root, HM.head.w * sc, (HM.head.h + HM.stem.h) * sc)
+  H.setPos(root, x or 0, y or 0)
+
+  local head = H.spawn(cfg, 'img', nm .. 'Head', root)
+  H.setSize(head, HM.head.w * sc, HM.head.h * sc)
+  H.setPos(head, 0, -((HM.head.h + HM.stem.h) * sc) / 2 + HM.head.h * sc / 2)   -- 贴根的下沿
+  H.setColor(head, 242, 226, 122, 255)                                          -- 柠檬黄
+
+  local stem = H.spawn(cfg, 'img', nm .. 'Stem', root)
+  H.setSize(stem, HM.stem.w * sc, HM.stem.h * sc)
+  H.setPos(stem, 0, -((HM.head.h + HM.stem.h) * sc) / 2 + HM.head.h * sc + HM.stem.h * sc / 2)
+  H.setColor(stem, 217, 199, 163, 255)                                          -- 浅木色
+
+  -- 下锤：t 从 0 → 1 → 0（一个来回）。真机上由 view 在 OnUpdate 里推进。
+  local baseY = y or 0
+  local function plunge(t)
+    t = math.max(0, math.min(1, t or 0))
+    local d = HM.plunge * sc * math.sin(t * math.pi)      -- sin 曲线：下去再上来
+    H.setPos(root, x or 0, baseY - d)
+  end
+  return { root = root, head = head, stem = stem, plunge = plunge, controls = { head, stem },
+           headW = HM.head.w, stemH = HM.stem.h, scale = sc }
+end
+
+-- ══════════════════════════════════════════════════════════
+-- 四-C、干冰：**真堆叠的冰堆 + 下沉的白雾 + 从下往上的结霜**（2026-10-01）
+--
+-- 玩法出处：干冰干柠檬水的第 2、3 步（柠檬锤连按 6+6 下，见 recipes.lua）。
+-- 视觉来历（网页原型上验证过，这里搬进游戏）：
+--   · **真堆叠**：`P.PILE` 11 块、5 层，**层高严格递增**、上层压在下一层的缝上、底宽顶窄。
+--     千星和浏览器一样"**后画的盖住先画的**"（README 的 Z 序事实）⇒ 只要按层序 spawn，
+--     上层自然压住下层，不需要任何层级参数。
+--   · **雾往下淌**：干冰的白雾是冷而重的（CO₂ 比空气重）。TPT `CO2.cpp` 也是
+--     `Gravity 0.1`（重气体往下沉）—— 上一版让雾往上飘，跟自己抄的来源都矛盾。
+--   · **结霜从下往上依次铺开**（下层先结），不是一瞬间全白。
+--
+-- 物性参数**真从开源项目里拿的**（不是"参考一下"）：
+--   · 雾  TPT `src/simulation/elements/FOG.cpp`：TYPE_GAS|PROP_LIFE_DEC、Loss 0.70、
+--         Gravity 0、Diffusion 0.99 ⇒ 有寿命会散、会扩散
+--   · 干冰 TPT `DRIC.cpp`：Weight 100（重 ⇒ 沉底）、Loss 0.00（不自散）、
+--         HighTemperature 195.65K = -77.5℃ → PT_CO2（升华）
+--   · CO₂ TPT `CO2.cpp`：LowTemperature 194.65K = **-78.5℃** → PT_DRIC（沉积成干冰）
+--   · 同一温度 Sandboxels（开源）`carbon_dioxide: { tempLow: -78.5, stateLow: "dry_ice" }`
+--     ⇒ **两个独立来源同一个数**
+--   · 冰受压 TPT `ICEI.cpp`：HighPressure 0.8 → PT_SNOW（"Crushes under pressure"）
+-- ══════════════════════════════════════════════════════════
+P.SUBST = {
+  -- 雾：dir = -1 表示**往下淌**（干冰雾）；lossTpt 是 TPT 原值（引用），
+  -- fadePerSec 是**我们映射后的调参**（照搬 0.70/秒 会半路就散光）。两个数分开放。
+  -- 白气用**碎絮**拼，不用大块（2026-10-01 用户："太廉价"）：
+  --   几根大圆角色块 ⇒ 一眼就是"贴了几张卡片"。碎絮 = 小块 + 大小/旋角/速度/透明度都错开
+  --   + 从**杯沿两侧**溢出 ⇒ 叠起来才有"一团"的感觉。千星只有扁平块 ⇒ 两边画法一致。
+  -- 白气的**路径**（2026-10-01 用户："冒的位置不太对"）：干冰在杯底 ⇒ 雾先在**杯内**从冰上
+  --   顶起来（被杯壁收着）→ 装满后**溢过杯沿**→ 再顺**杯壁外侧往下淌**（CO₂ 比空气重）。
+  --   risePx 是"杯内上升"速度，**本项目调参**；dir/fallPx 只管"杯外下落"，来自 TPT。
+  -- ★ 2026-10-01 用户：「我们要的应该是**飘动的雾气**」——搜 smoke/流体都搜偏了。
+  --   飘动的关键是 **drift（左右漂移）**：sparticles 的文档写得很准——
+  --   "每个粒子会左右漂移多少，产生**漂浮或被风吹**的效果"；再叠**视差分层**就有纵深。
+  --   所以雾不是"直着往下掉"，而是**慢慢左右飘 + 缓缓下沉 + 悬停**。
+  fog    = { dir = -1, risePx = 0.9, fallPx = 0.34, driftAmp = { 4, 14 }, driftHz = { 0.25, 0.55 },
+             layers = 3, layerSpeed = { 1.0, 0.65, 0.4 }, layerAlpha = { 1.0, 0.7, 0.45 },
+             layerSize = { 1.0, 0.8, 0.6 },
+             -- ★ 双尺度：大而极淡的**晕** + 小而亮的**芯**。只用一种尺寸 ⇒ 一串珠子；
+             --   两种叠起来才有"一团"的观感（粒子烟雾的常规做法）。
+             haloEvery = 3, haloScale = 1.9, haloAlpha = 0.35, haloSpeed = 0.6,
+             spreadPerSec = 0.5, fadePerSec = 0.30,
+             lossTpt = 0.70, gravity = 0.1,
+             -- ★ 2026-10-01 用户「冒的太少」⇒ 片数 14→30、尺寸放大、浓度提高，
+             --   白气在杯沿**多停一会儿**（overSpeed 调慢）⇒ 杯口形成一层浓罩
+             wisps = 30, wispW = { 14, 34 }, wispWMax = 44, wispH = { 10, 22 }, wispA = 0.62,
+             overSpeed = 0.55, driftPx = { 0.06, 0.16 },
+             -- ★ 2026-10-01：白气用**圆**（100002），不用方块 —— 方块再小也带棱角，
+             --   圆形叠起来才像雾。片数不变，只是换了形状（浏览器侧用 border-radius:50%）。
+             art = 100002,
+             src = 'TPT FOG.cpp(Loss 0.70) + CO2.cpp(Gravity 0.1 重气体)' },
+  bubble = { risePx = 0.8, src = 'TPT CO2.cpp（重气体）/ 液体浮力 ⇒ 速度为本项目调参' },
+  dryice = { weight = 100, loss = 0, depositC = -78.5, sublimeC = -77.5,
+             src = 'TPT DRIC.cpp + Sandboxels carbon_dioxide（两处 -78.5 一致）' },
+  ice    = { crushPressure = 0.8, src = 'TPT ICEI.cpp' },
+}
+
+-- 冰堆布局：[x, y(相对杯底往上), w, h, rot]，**按层序**（底层在前 ⇒ 后画的上层压住下层）
+P.PILE = {
+  -- 第一层：铺满杯底（3 块，留缝）
+  { -22,  3, 21, 12,  -8 }, { -1,  3, 22, 13,   5 }, { 20,  3, 20, 12,  13 },
+  -- 第二层：压在缝上（2 块）
+  { -12, 14, 21, 12,  -3 }, { 10, 14, 22, 12,   8 },
+  -- 第三层（3 块）
+  { -18, 25, 16, 11,  11 }, { -1, 25, 20, 12,  -6 }, { 15, 25, 15, 10,   7 },
+  -- 第四层（2 块）
+  {  -9, 35, 18, 11,   4 }, {  9, 35, 16, 10, -10 },
+  -- 顶层：收尖
+  {  -1, 44, 14,  9,   6 },
+}
+
+-- 基础图元号（README 第 4 条）：方块/圆/三角/四角星/五角星/圆环
+P.ART = { square = 100001, circle = 100002, triangle = 100003, star4 = 100004, star5 = 100005, ring = 100006 }
+
+-- 像素白气用的**字符**（2026-10-01 口径对齐：用户说的 ● 是**文字字符**，不是圆图元）
+--   · 一个文本框里放一串 ● ⇒ **一行只占 1 个控件**（与火焰用 ■ 同一招，省开销）
+--   · 用 ● 比 ░▒▓█ 更适合雾：**圆点本身就是"粒子"**
+--   · 浓度不靠字形深浅，靠**点的疏密**（Bayer 有序抖动）⇒ 单字符也能表达渐变
+--   · 空档必须用 **U+3000**（与 ●○ 等宽；普通空格会错位）
+--
+-- ★★ 源码里**不许出现非 ASCII 字节**（千星会转义 ⇒ 真机加载失败，README 记过这条）
+--    ⇒ 字符一律用**字节**写：U+3000 = E3 80 80、U+25CF ● = E2 97 8F、U+25CB ○ = E2 97 8B
+P.GLYPH = {
+  space  = string.char(0xE3, 0x80, 0x80),   -- U+3000（空档）
+  dot    = string.char(0xE2, 0x97, 0x8F),   -- U+25CF ●（密）
+  ring   = string.char(0xE2, 0x97, 0x8B),   -- U+25CB ○（疏）
+  square = string.char(0xE2, 0x96, 0xA0),   -- U+25A0 ■（火焰那套在用）
+}
+-- 抖动阈值（按**实测**定：密度 max 0.45 / 中位 0.044 / 90 分位 0.109）
+P.DOT_TONE = { full = { 0.050, 0.050 }, half = { 0.012, 0.030 } }
+-- 4×4 有序抖动矩阵（Bayer）
+P.BAYER = { 0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5 }
+
+-- 密度 → 字符（与网页同一套规则）：两级抖动
+function P.dotOf(v, i, j)
+  local T = P.DOT_TONE
+  if not v or v <= 0.001 then return P.GLYPH.space end
+  local b = P.BAYER[((j or 0) % 4) * 4 + ((i or 0) % 4) + 1] / 16
+  if v > T.full[1] + b * T.full[2] then return P.GLYPH.dot end
+  if v > T.half[1] + b * T.half[2] then return P.GLYPH.ring end
+  return P.GLYPH.space
+end
+
+-- 自带 LCG（千星禁 math.random ⇒ 随机也得自己造）
+local lcg = 12345
+local function rnd()
+  lcg = (lcg * 1103515245 + 12345) % 2147483648
+  return lcg / 2147483648
+end
+
+-- 建一堆干冰（挂在**杯子根**下 ⇒ 跟着杯子缩放/移动；晚于杯身 spawn ⇒ 压在杯身之上）
+--   opts: { scale, frost = true, fog = true }
+function P.dryice(cfg, name, cupRoot, opts)
+  opts = opts or {}
+  local S = P.spec.cup
+  local sc = opts.scale or 1
+  local hh = S.h
+  local botY = -hh * sc / 2          -- 杯底（相对杯子根中心）
+  local nm = name or 'DryIce'
+
+  local chunks, frosts, fogs, pools = {}, {}, {}, {}
+  local state = { t = 0, controlCount = 0 }
+
+  -- ① 冰堆：**按层序** spawn ⇒ 后画的压住先画的
+  for i, c in ipairs(P.PILE) do
+    local el = H.spawn(cfg, 'img', nm .. 'Chunk' .. i, cupRoot)
+    H.setSize(el, 0, 0); H.setPos(el, 0, 0)
+    H.setColor(el, 244, 251, 255, 0)
+    pcall(function() el.localRotationZ = c[5] end)
+    chunks[i] = { el = el, x = c[1] * sc, y = c[2] * sc, w = c[3] * sc, h = c[4] * sc, rot = c[5], t = 0 }
+  end
+  -- 堆顶亮棱
+  local topEl = H.spawn(cfg, 'img', nm .. 'Top', cupRoot)
+  H.setSize(topEl, 0, 0); H.setPos(topEl, 0, 0); H.setColor(topEl, 255, 255, 255, 0)
+
+  -- ② 杯壁结霜：3 层，从下往上（越往上越薄越淡），依次铺开
+  if opts.frost ~= false then
+    for w = 1, 3 do
+      local el = H.spawn(cfg, 'img', nm .. 'Frost' .. w, cupRoot)
+      H.setSize(el, 0, 0); H.setPos(el, 0, 0)
+      H.setColor(el, 226, 240, 255, 0)
+      frosts[w] = { el = el, y0 = botY + (6 + (w - 1) * 16) * sc, h = 15 * sc,
+                    w = (S.baseW + 6 - (w - 1) * 3) * sc, a = 0.34 - (w - 1) * 0.07, t = 0 }
+    end
+  end
+
+  -- ③ 雾瀑 + 雾滩：从杯口**往下淌**，边淌边铺开，按寿命淡出后在杯口重生
+  if opts.fog ~= false then
+    local cfgCirc = { root = cfg.root, img = cfg.img, text = cfg.text, art = (P.SUBST.fog.art or 100002) }
+    -- 雾滩：杯子下面几片**扁的椭圆**（干冰雾沉到台面上），也是碎片拼的
+    for pk = 1, 4 do
+      local el = H.spawn(cfgCirc, 'img', nm .. 'Pool' .. pk, cupRoot)
+      H.setSize(el, 0, 0); H.setPos(el, 0, 0)
+      H.setColor(el, 233, 244, 255, 0)
+      pools[pk] = { el = el, x = ({ -30, -4, 20, 34 })[pk] * sc, y = (-30 - (pk - 1) * 4) * sc,
+                    w = ({ 70, 92, 64, 44 })[pk] * sc, h = ({ 11, 14, 10, 8 })[pk] * sc,
+                    a = ({ 0.30, 0.22, 0.26, 0.20 })[pk] }
+    end
+    -- 白气碎絮：从杯沿**两侧**溢出，14 片
+    local F = P.SUBST.fog
+    for f = 1, F.wisps do
+      local el = H.spawn(cfgCirc, 'img', nm .. 'Wisp' .. f, cupRoot)
+      H.setSize(el, 0, 0); H.setPos(el, 0, 0)
+      H.setColor(el, 236, 246, 255, 0)
+      local side = (f % 2 == 0) and -1 or 1
+      local layer = f % F.layers          -- ★ 视差分层：0=近（大/快/浓），2=远（小/慢/淡）
+      local isHalo = (f % F.haloEvery == 0)   -- ★ 三分之一做"晕"（大、极淡、慢）
+      local sc2 = (isHalo and F.haloScale or 1) * F.layerSize[layer + 1]
+      local a2 = (isHalo and F.haloAlpha or 1) * F.layerAlpha[layer + 1]
+      local v2 = (isHalo and F.haloSpeed or 1) * F.layerSpeed[layer + 1]
+      local wi = {
+        el = el, side = side, layer = layer, halo = isHalo, alphaMul = a2,
+        w = (F.wispW[1] + rnd() * (F.wispW[2] - F.wispW[1])) * sc2 * sc,
+        h = (F.wispH[1] + rnd() * (F.wispH[2] - F.wispH[1])) * sc2 * sc,
+        rot = (rnd() - 0.5) * 26,
+        -- 摆动（飘）：幅度/频率/初相各自不同 ⇒ 不会整齐划一地摆
+        amp = (F.driftAmp[1] + rnd() * (F.driftAmp[2] - F.driftAmp[1])) * sc,
+        hz = F.driftHz[1] + rnd() * (F.driftHz[2] - F.driftHz[1]),
+        ph = rnd() * 6.2831853,
+        baseX = 0,
+        drift = side * (F.driftPx[1] + rnd() * (F.driftPx[2] - F.driftPx[1])) * v2 * sc,
+        fall = F.fallPx * (0.75 + rnd() * 0.6) * v2 * sc,
+        grow = (0.06 + rnd() * 0.10) * sc2 * sc,
+        life = 1,
+      }
+      -- 初始把 14 片铺在整条路径上（三分之一已在杯外下落，其余在杯内沿高度铺开）
+      if f % 4 == 0 then
+        wi.phase = 'out'
+        wi.x = side * (S.mouthW / 2 + 4 + rnd() * 20) * sc
+        wi.y = (hh / 2 - 24 - rnd() * 34) * sc
+      else
+        wi.phase = 'in'
+        local tt = 0.10 + (f / F.wisps) * 0.82
+        wi.y = botY + tt * hh * sc
+        wi.x = side * math.max(6, (S.baseW / 2 + (S.mouthW / 2 - S.baseW / 2) * tt - S.inset) - 6 - rnd() * 6) * sc
+        wi.life = 0.35 + rnd() * 0.4
+      end
+      wi.baseX = wi.x                       -- 摆动绕这个位置（"飘"是绕着走，不是一路平移）
+      pcall(function() wi.el.localRotationZ = wi.rot end)
+      fogs[f] = wi
+    end
+  end
+
+  local function update(dt)
+    dt = dt or 0.033
+    state.t = state.t + dt
+    -- ① 冰堆逐块落下（每块间隔 0.06s，从上方 10px 掉进来）
+    for i = 1, #chunks do
+      local c = chunks[i]
+      local want = (state.t - 0.05 - (i - 1) * 0.06) / 0.16
+      if want < 0 then want = 0 elseif want > 1 then want = 1 end
+      if want > c.t then
+        c.t = want
+        local drop = (1 - c.t) * 10 * sc
+        H.setSize(c.el, c.w * c.t, c.h * c.t)
+        H.setPos(c.el, c.x, botY + c.y + c.h / 2 - drop)
+        H.setColor(c.el, 244, 251, 255, math.floor(math.min(1, c.t * 1.4) * 255))
+      end
+    end
+    -- 堆顶亮棱（最上一块落够 60% 才亮）
+    local top = chunks[#chunks]
+    if top and top.t > 0.6 then
+      H.setSize(topEl, top.w * 0.8, 3 * sc)
+      H.setPos(topEl, top.x, botY + top.y + top.h - 1 * sc)
+      H.setColor(topEl, 255, 255, 255, 255)
+    end
+    -- ② 结霜：下层先结、上层后结
+    for w = 1, #frosts do
+      local fr = frosts[w]
+      if fr.t < 1 then
+        fr.t = math.min(1, fr.t + dt * (1.2 - (w - 1) * 0.25))
+        H.setSize(fr.el, fr.w, fr.h * fr.t)
+        H.setPos(fr.el, 0, fr.y0 + fr.h / 2)
+        H.setColor(fr.el, 226, 240, 255, math.floor(fr.a * fr.t * 255))
+      end
+    end
+    -- ③ 白气碎絮：三段循环 —— 杯内上升 → 溢过杯沿 → 沿杯壁外侧下落
+    local F = P.SUBST.fog
+    for i = 1, #fogs do
+      local fo = fogs[i]
+      if fo.phase == 'in' then
+        -- ① 杯内：从冰上往上顶，被杯壁收着（不许穿出内壁），逐渐显形
+        fo.y = fo.y + F.risePx * dt * 60 * sc
+        local tt = math.max(0, math.min(1, (fo.y - botY) / (hh * sc)))
+        local lim = math.max(6, (S.baseW / 2 + (S.mouthW / 2 - S.baseW / 2) * tt - S.inset) - 6) * sc
+        fo.baseX = fo.baseX + fo.drift * 0.25 * dt * 60
+        fo.x = fo.baseX + math.sin(state.t * fo.hz * 6.2831853 + fo.ph) * fo.amp * 0.5   -- 杯里也在飘（幅度减半）
+        if math.abs(fo.x) > lim then fo.x = (fo.x < 0 and -1 or 1) * lim; fo.baseX = fo.x end   -- ★ 被杯壁挡住
+        fo.life = math.min(1, fo.life + dt * 1.6)
+        if fo.y >= hh * sc / 2 - 5 * sc then                                     -- 装满了 ⇒ 溢过杯沿
+          fo.phase = 'over'
+          fo.y = hh * sc / 2 - 3 * sc
+          fo.x = fo.side * (S.mouthW / 2 - 5) * sc
+        end
+      elseif fo.phase == 'over' then
+        fo.y = fo.y + F.risePx * 0.25 * dt * 60 * sc
+        fo.x = fo.x + fo.side * P.SUBST.fog.overSpeed * dt * 60 * sc   -- 慢 ⇒ 杯沿多停，形成浓罩
+        if math.abs(fo.x) >= (S.mouthW / 2 + 6) * sc then fo.phase = 'out' end
+      else
+        -- ③ 杯外：**飘**（左右慢摆 = "飘动的雾气"的核心）+ 缓缓下沉 + 边散边转
+        fo.y = fo.y + F.dir * fo.fall * dt * 60
+        fo.baseX = fo.baseX + fo.drift * dt * 60                                  -- 整体慢慢漂（风）
+        fo.x = fo.baseX + math.sin(state.t * fo.hz * 6.2831853 + fo.ph) * fo.amp   -- ★ 左右摆动
+        local wCap = F.wispWMax * (fo.halo and F.haloScale or 1)                     -- 晕可以更大
+        if fo.w < wCap then fo.w = math.min(wCap, fo.w + fo.grow * dt * 60) end
+        fo.rot = fo.rot + math.sin(state.t * fo.hz * 2 + fo.ph) * 0.6 * dt * 60
+        fo.life = fo.life - F.fadePerSec * dt * (1 - (fo.layer or 0) * 0.15)
+        if fo.life <= 0 or fo.y < botY - 40 * sc then
+          -- 回杯底重新来一遍（side 不变，看的人不会觉得"突然换边"）
+          local side = fo.side
+          -- ★ 重生时必须**重新套用"晕/芯"与分层缩放**：我第一版漏了，
+          --   晕重生一次就退化成芯的尺寸（测试里"晕更大"的均值变成 33 vs 33 才发现）
+          local rsc = (fo.halo and F.haloScale or 1) * F.layerSize[(fo.layer or 0) + 1]
+          fo.phase = 'in'
+          fo.y = botY + (0.10 + rnd() * 0.8) * hh * sc
+          fo.x = side * math.max(6, (S.baseW / 2 - S.inset) - 6) * sc
+          fo.w = (F.wispW[1] + rnd() * (F.wispW[2] - F.wispW[1])) * rsc * sc
+          fo.h = (F.wispH[1] + rnd() * (F.wispH[2] - F.wispH[1])) * rsc * sc
+          fo.rot = (rnd() - 0.5) * 26
+          fo.drift = side * (F.driftPx[1] + rnd() * (F.driftPx[2] - F.driftPx[1])) * sc
+          fo.fall = F.fallPx * (0.75 + rnd() * 0.6) * sc
+          fo.grow = (0.06 + rnd() * 0.10) * rsc * sc
+          fo.life = 0.35
+          pcall(function() fo.el.localRotationZ = fo.rot end)
+        end
+      end
+      H.setSize(fo.el, fo.w, fo.h)
+      H.setPos(fo.el, fo.x, fo.y)
+      -- 杯内的白气隔着杯壁看 ⇒ 再虚一档
+      local alpha = fo.life * F.wispA * (fo.phase == 'in' and 0.7 or 1) * (fo.alphaMul or F.layerAlpha[(fo.layer or 0) + 1])
+      H.setColor(fo.el, 236, 246, 255, math.floor(math.max(0, math.min(1, alpha)) * 255))
+    end
+    -- 雾滩：几片扁的，随冰堆一起显形
+    local pt = math.min(1, state.t / 1.0)
+    for pk = 1, #pools do
+      local pf = pools[pk]
+      H.setSize(pf.el, pf.w, pf.h)
+      H.setPos(pf.el, pf.x, botY + pf.y)
+      H.setColor(pf.el, 233, 244, 255, math.floor(pf.a * pt * 255))
+    end
+  end
+
+  state.controlCount = #chunks + 1 + #frosts + #fogs + #pools   -- 冰堆 + 顶棱 + 壁霜 + 雾碎絮 + 雾滩
+  local controls = {}
+  for i = 1, #chunks do controls[#controls + 1] = chunks[i].el end
+  controls[#controls + 1] = topEl
+  for w = 1, #frosts do controls[#controls + 1] = frosts[w].el end
+  for i = 1, #fogs do controls[#controls + 1] = fogs[i].el end
+  for pk = 1, #pools do controls[#controls + 1] = pools[pk].el end
+
+  return { update = update, controls = controls, chunks = chunks, frosts = frosts, fogs = fogs, pools = pools,
+           art = (P.SUBST.fog.art or 100002),
+           state = state, botY = botY, scale = sc }
+end
+
+-- ══════════════════════════════════════════════════════════
+-- 四-B、杯子：**三角形 + 遮挡**（默认方案；2026-10-01）
+--
+-- 方案出处（都在本仓，别再从头试一遍）：
+--   · `lua/src/clip_test.lua`   —— 前置实测：① 父控件**不裁**子控件（实测读回 600×600）
+--                                    ⇒ 只能遮挡；② 遮挡块靠**背景色**，只在纯色背景成立。
+--   · `lua/src/cup_tri_demo.lua` —— 电脑端的探索版（思路对，但**几何算错了**：
+--                                    它写 `Htri = hh/ratio`，正确是 `hh/(1-ratio)`，
+--                                    实测"距顶 100px 处宽 38.8"（杯子要求 69.2），
+--                                    而且遮挡块只比尖点高 1px ⇒ 等于没盖住）。
+--   这里用的是**验证过的几何**（网页原型上逐点比对叠条法，偏差 0.000px）：
+--     三角顶宽 = 口径，尖点在杯底之下；液体的三角上沿放在**液面**，尖点同样由遮挡盖住。
+--
+-- 控件数：外锥 + 液锥 + 遮挡 + 液面线 + 杯口 + 高光 + 杯底亮边 + 根 = 8（叠条法是 52）
+--
+-- ★ 三条实现铁律（踩过）：
+--   ① 出三角形必须走 `cfg.art`（H.spawn 内部 SetImage(StaticReference, art)）；
+--      在脚本里直接 tri:SetImage(...) 沙箱不生效 → 画出来全是方块。
+--   ② 三角图元默认**顶点在上** ⇒ 杯子要"宽上窄下"，必须 `localRotationZ = 180`。
+--   ③ 图元转 180° 后尖点比控件框**多伸一段**（P.cone 实测 24/194）⇒ 遮挡块要按
+--      `tipPadRatio` 多盖一截，否则杯子底下会露出一个小尖。
+-- ══════════════════════════════════════════════════════════
+function P.cupTri(cfg, name, x, y, drink, opts)
+  opts = opts or {}
+  -- ★ maskColor **必传**：遮挡块颜色 = 杯子背后的颜色。平台不裁子控件，只能同色遮挡；
+  --   给错颜色就会在杯子下方露出一块异色（用户真机上报过"杯子下方被挡住"）。
+  if not opts.maskColor then
+    error('P.cupTri 需要 opts.maskColor（遮挡块颜色 = 杯子背后的颜色；画布上用 P.spec.MASK_CANVAS）')
+  end
+  local s = P.spec.cup
+  local mouthW, baseW, hh = s.mouthW, P.cupBottomWidth(s), s.h
+  local tanA = (mouthW - baseW) / 2 / hh
+  local sc = opts.scale or 1
+  local nm = name or 'Cup'
+  drink = drink or P.drink.water
+  local mc = opts.maskColor
+
+  local root = H.spawn(cfg, 'img', nm .. 'Root')
+  H.setSize(root, mouthW * sc, hh * sc)
+  H.setPos(root, x or 0, y or 0)
+  local topY, botY = hh * sc / 2, -hh * sc / 2
+
+  -- ① 外锥：顶宽 = 口径，上沿贴杯口，尖点在杯底之下很远
+  local Hfull = (mouthW / 2) / tanA * sc
+  local tri = H.spawn(cfg, 'img', nm .. 'BodyTri', root)
+  H.setSize(tri, mouthW * sc, Hfull)
+  H.setPos(tri, 0, topY - Hfull / 2)
+  pcall(function() tri.localRotationZ = 180 end)
+  H.setColor(tri, 224, 240, 255, 110)
+
+  -- ② 液锥（上沿放在液面、宽 = 该处内壁宽；尖点同样在杯底之下）
+  local liq = H.spawn(cfg, 'img', nm .. 'LiqTri', root)
+  H.setSize(liq, 0, 0); H.setPos(liq, 0, 0)
+  H.setColor(liq, drink[1], drink[2], drink[3], 240)
+
+  -- ③ 液面亮线（水平）
+  local liqTop = H.spawn(cfg, 'img', nm .. 'LiqTop', root)
+  H.setSize(liqTop, 0, 0); H.setPos(liqTop, 0, 0)
+  H.setColor(liqTop, 255, 255, 255, 130)
+
+  -- ④ 遮挡块：盖住"杯底以下"那一截（含图元留白）
+  local tipPad = s.tipPadRatio * Hfull
+  local maskH = (baseW / 2) / tanA * sc + tipPad + 8
+  local mask = H.spawn(cfg, 'img', nm .. 'Mask', root)
+  H.setSize(mask, (baseW + 4) * sc, maskH)
+  H.setPos(mask, 0, botY + 0.6 - maskH / 2)          -- 上沿压在杯底线上（+0.6 防缝）
+  H.setColor(mask, mc[1], mc[2], mc[3], mc[4] or 255)
+
+  -- ⑤ 杯口亮边（实色；杯口看着像玻璃口，不靠半透明）
+  local lip = H.spawn(cfg, 'img', nm .. 'Lip', root)
+  H.setSize(lip, (mouthW + 4) * sc, s.lipH * sc)
+  H.setPos(lip, 0, topY - s.lipH * sc / 2)
+  H.setColor(lip, 234, 243, 255, 255)
+
+  -- ⑥ 左侧竖直高光（竖直块，不用旋转斜条 —— 旋转斜条贴不上叠条/三角的边）
+  local shine = H.spawn(cfg, 'img', nm .. 'Shine', root)
+  H.setSize(shine, s.shineW * sc, hh * 0.82 * sc)
+  H.setPos(shine, -(mouthW / 2 - s.inset - s.shineW - 6) * sc, 0)
+  H.setColor(shine, 255, 255, 255, 130)
+
+  -- ⑦ 杯底亮边（可选件；把"遮挡的切边"变成一条设计好的边）
+  local base = nil
+  if s.baseRimH and s.baseRimH > 0 then
+    base = H.spawn(cfg, 'img', nm .. 'Base', root)
+    -- 比杯底窄 2px、下沿正好压在底线上（宽了会两边凸出，高了会飘在半空）
+    H.setSize(base, (baseW - 2) * sc, s.baseRimH * sc)
+    H.setPos(base, 0, botY + s.baseRimH * sc / 2)
+    H.setColor(base, 207, 224, 245, 255)             -- 实色（半透明压在玻璃/液体上会糊）
+  end
+
+  local function halfInnerAt(t)
+    local hOut = baseW / 2 + (mouthW / 2 - baseW / 2) * t
+    return hOut - s.inset
+  end
+  local function setFill(frac)
+    frac = math.max(0, math.min(1, frac or 0))
+    local surfY = botY + frac * hh * sc
+    if frac <= 0.002 then
+      H.setSize(liq, 0, 0); H.setPos(liq, 0, 0)
+      H.setSize(liqTop, 0, 0); H.setPos(liqTop, 0, 0)
+    else
+      local half = halfInnerAt(frac)
+      local w = half * 2 * sc
+      local hL = half / tanA * sc                     -- 内侧与外侧平行 ⇒ 斜率相同
+      H.setSize(liq, w, hL)
+      H.setPos(liq, 0, surfY - hL / 2)
+      H.setSize(liqTop, w, 2)
+      H.setPos(liqTop, 0, surfY)
+    end
+  end
+  setFill(0)
+
+  return {
+    root = root, setFill = setFill, tri = tri, liq = liq, liqTop = liqTop,
+    mask = mask, lip = lip, shine = shine, base = base,
+    controls = { tri, liq, liqTop, mask, lip, shine, base },
+    mouthW = mouthW, baseW = baseW, mode = 'tri',
+    geo = { h = hh, mouth = mouthW, base = baseW, inset = s.inset,
+            slopeDeg = P.cupSlopeDeg(s), triH = Hfull, tipPad = tipPad },
+  }
+end
+
+-- ★ 对外入口：默认走三角方案；`opts.mode = 'band'` 回退到叠条（兜底/对照用）
+function P.cup(cfg, name, x, y, drink, opts)
+  opts = opts or {}
+  if (opts.mode or P.spec.cup.mode) == 'band' then
+    return P.cupBands(cfg, name, x, y, drink)
+  end
+  return P.cupTri(cfg, name, x, y, drink, opts)
 end
 
 -- ══════════════════════════════════════════════════════════

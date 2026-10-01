@@ -515,7 +515,11 @@ function V.init(hostCfg)
     v.big.line1 = SK.textC(hostCfg, 'BigL1', 0, 10, 900, 'head', C.text)
     v.big.line2 = SK.textC(hostCfg, 'BigL2', 0, -40, 900, 'body', C.dim)
     v.big.line3 = SK.textC(hostCfg, 'BigL3', 0, -90, 900, 'small', C.dim)
-    v.big.controls = { v.big.title, v.big.line1, v.big.line2, v.big.line3 }
+    -- ★ 环保凭证两行（2026-10-01）：结算页专有。L5 是**推导链**——
+    --   玩家若想"这 0.27 克哪来的"，照着这行能自己算一遍（见 recipes.eco 的注释）
+    v.big.line4 = SK.textC(hostCfg, 'BigL4', 0, -140, 900, 'body', C.text)
+    v.big.line5 = SK.textC(hostCfg, 'BigL5', 0, -186, 900, 'small', C.dim)
+    v.big.controls = { v.big.title, v.big.line1, v.big.line2, v.big.line3, v.big.line4, v.big.line5 }
 
   -- ═══════════════════════════════════════════════════════════════════
   -- ★★ 初始界面（照原版 showStart 还原）
@@ -921,6 +925,7 @@ function V.drawMenu(v, sel)
   -- 三行大字在菜单里不用（原版的信息都在面板里）
   setText(v.big.title, ''); setText(v.big.line1, '')
   setText(v.big.line2, ''); setText(v.big.line3, '')
+  setText(v.big.line4, ''); setText(v.big.line5, '')
   -- ★ 最后**直接 SetVisible(true)**（H.show 对这批无效，且 SetVisible 紧跟 SetActive 会翻回 false）
   for _, c in ipairs(M.controls) do
     pcall(function() c:SetActive(true) end)
@@ -934,18 +939,43 @@ end
 function V.drawResult(v, s)
   if not v or not s then return end
   for _, c in ipairs(v.big.controls) do pcall(function() c:SetVisible(true) end) end
-  local function put(title, tCol, tSize, l1, l2, l3)
+  -- 环保凭证（★ 两个结算页面都用它）
+  --   ★ 2026-10-01 用户定：**只保留"固化下来的减碳"，不搞碳排放计算**。
+  --   所以这里只有两句话：固化了几毫克 + 一句一本正经的感谢。
+  --   大反差（空气里本来就没多少 CO₂）留给玩家自己想 —— 他自己笑出来的比写出来好笑。
+  -- ★ 2026-10-01 用户定：**不做币种转化**，提前算好、直接输出结果（毫克 / 津元）
+  --   所以这里没有"卖出 0.0000000243 元"那行，也没有汇率说明 —— 就是两个成品数。
+  local function ecoLines(eco)
+    local fixed, zwd = (eco and eco.fixed) or 0, (eco and eco.zwd) or 0
+    if fixed <= 0 then return '', '' end
+    local l4 = string.format('本单固化 CO₂ %.2f 毫克', fixed * 1000)
+    local l5 = string.format('= %.2f 亿津巴布韦元 · 感谢您为环保事业的贡献', zwd / 1e8)
+    return l4, l5
+  end
+  local function sumEco(stats)
+    local e = { fixed = 0, zwd = 0 }
+    for _, d in ipairs(stats or {}) do
+      local x = d.eco or {}
+      e.fixed = e.fixed + (x.fixed or 0)
+      e.zwd = e.zwd + (x.zwd or 0)
+    end
+    return e
+  end
+  local function put(title, tCol, tSize, l1, l2, l3, e4, e5)
     setText(v.big.title, title); setStyle(v.big.title, tSize, tCol)
     setText(v.big.line1, l1 or ''); setStyle(v.big.line1, T.font.head, C.text)
     setText(v.big.line2, l2 or ''); setStyle(v.big.line2, T.font.body, C.dim)
     setText(v.big.line3, l3 or ''); setStyle(v.big.line3, T.font.small, C.dim)
+    setText(v.big.line4, e4 or ''); setStyle(v.big.line4, T.font.body, C.text)
+    setText(v.big.line5, e5 or ''); setStyle(v.big.line5, T.font.small, C.gold)
   end
   if s.ended and s.result then
     local r = s.result
     put(string.format('收摊！评级 %s', tostring(r.rank)), C.gold, T.font.display,
       string.format('总分 %d', r.total or 0),
       string.format('出餐 %d · 流失 %d · 翻车 %d', s.served or 0, s.left or 0, s.mistakes or 0),
-      '按空格回到菜单，再来一局')
+      '按空格回到菜单，再来一局',
+      ecoLines(sumEco(s.dayStats)))
     return
   end
   if s.settling then
@@ -956,7 +986,8 @@ function V.drawResult(v, s)
       last and string.format('出餐 %d 杯 · 营业额 %d', last.served or 0, last.money or 0) or '',
       last and string.format('流失 %d · 翻车 %d', last.left or 0, last.mistakes or 0) or '',
       string.format('房钱 %s · 手上还剩 %d 元      按空格继续',
-        (last and last.paid) or '已付', s.money or 0))
+        (last and last.paid) or '已付', s.money or 0),
+      ecoLines(last and last.eco))
   end
 end
 
