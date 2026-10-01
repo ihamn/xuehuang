@@ -3,6 +3,8 @@
 > **这份是交付后的运维手册**：谁负责什么、数据怎么流、改动要碰哪里。
 > 每次**结构性改动**都必须更新它 —— 过时的条目比没有更糟。
 > 最近一次更新：2026-09-27（还原度重做 r1：键位/手法/小票寻路/名额口径）
+> **2026-10-01 晚：加入"写入链路诊断"构建**（`lua/src/diag.lua` + 写入点观测 + `forceWrite` 开关）——
+> 见第八节。这是**临时观测代码**，确诊后要连同写入点改动一起回退。
 
 ---
 
@@ -41,6 +43,7 @@
 | `input.lua` | 按键绑定（`IN.BIND` 唯一真相）+ 光标点击 + 命中测试 `IN.hit` + 事件派发 `IN.pump` | 不许决定"动作做什么"（那是入口/玩法的事） |
 | `host.lua` | 平台能力：挂载点、模板扫描、素材号、建控件 `spawn`（`spawn(cfg,kind,name,parent)`，第 4 个 parent **可选**，用于嵌套视觉件）、画布、隐藏空控件、常驻光标 | 不许含玩法或版式 |
 | `xuehuang.lua` | ★入口：生命周期、场景状态机（menu/play）、输入路由（键→界面层/玩法层）、提示文案 | 不许含玩法规则 |
+| `diag.lua` | **★ 临时：写入链路诊断**（2026-10-01）。`D.try(tag,控件,值,fn)` 检查每次控件写入的 pcall 返回值、失败打一行 ASCII `[WERR]`；缓存命中但该控件上次写失败 ⇒ 打 `[WERR-CACHE]`（缓存投毒的直接证据）；每 30 帧一行 `[WERR-SUM]`。**只观测，不改行为** | 不许带玩法逻辑；确诊后删除 |
 
 ---
 
@@ -171,4 +174,85 @@ G.tick(dt) → day.lua D.tick：
 | 原版 A/S 开关键 | 平台无 A/S → 营业中用 `1` / `2` |
 | 原版 B/C 工位键 | 平台无 B/C → 用 `Y` / `K`（语义对齐：四个工位各一键）。编辑器里可把奇匠按键改绑成 B/C |
 | 9003 条 `[REJECT]` | 已消除（端到端实测按键无活率 0.0%）；探针仍保留，用 `showState=1` 可开 |
-| 脚本变量 | `autoplay=1` 机器人代打（含自己开门）、`heartbeat=1` 心跳、`showState=1` 每秒工位状态、`showCounts=1` 控件计数 |
+| 脚本变量 | `autoplay=1` 机器人代打（含自己开门）、`heartbeat=1` 心跳、`showState=1` 每秒工位状态、`showCounts=1` 控件计数；**临时**：`diag=0` 关诊断、`forceWrite=1` 每帧无视缓存强制写（见第八节） |
+
+---
+
+## 八、★ 写入链路诊断构建（2026-10-01 晚，临时）
+
+**为什么有它**：真机现象"鼠标点正常、键盘按没反应；逻辑在走（`ok=true`）、画面不动"，本地全绿。
+现在的头号嫌疑是**某次控件写入在真机上报错、被 `pcall` 吞掉，而 view 的缓存已经记成"写过了"**
+⇒ 之后每帧都判"值没变"、直接 return ⇒ 画面永久停在那一帧。这一轮只做**让失败可见**，不改行为。
+
+### 8.1 改了什么（全部是"观测"，无语义变化）
+
+| 文件 | 观测点 |
+|---|---|
+| `lua/src/diag.lua` | 新增模块 `D`：`try` / `cacheSkip` / `note` / `boot` / `afterAct` / `summary`；构建标记 `xuehuang-diag-w1` |
+| `lua/src/view.lua` | `setText` / `setStyle`（★ 唯一没有整数护栏的字号写入）+ 可见性：`menuVisible` / `boardVisible` / `menuBig` / `big` |
+| `lua/src/host.lua` | `setFont`(字号/字色) / `setColor` / `setText` / `fitText`(尺寸/字号) / `setAlpha` / `setPos` / `setSize` / `show` / `hide` |
+| `lua/src/xuehuang.lua` | `D.setup`（读 `diag`/`forceWrite`）、`afterAct` 里被吞的错误、`bootErr` 一行、`D.summary` 周期汇总 |
+
+> `diag-write-path/写入点清单.md` 是逐字清单；**清单之外**追加了可见性写入
+> （`H.show/H.hide`、`V.setBoardVisible/setMenuVisible`、菜单大字）—— 它们每帧都走，
+> 且"SetVisible 被无声吞掉"在本项目**有前科**，所以一并纳入观测。
+
+### 8.2 产物与判据
+
+| 项 | 值 |
+|---|---|
+| 诊断产物 | `dist/xuehuang.diag.lua`（337472 字节，19 个模块，sha256 `630AD316…9FF9D36`） |
+| 加密/转义 | `bundle-lint` 通过（字符串里的非 ASCII 全部 Lua 十进制转义） |
+| 部署位置 | 关卡 `1073741825` 的 `external_lua_file/xuehuang.lua`（原文件已备份到 `dist/diag-w1-backup/`） |
+| **关卡里是否跑上了诊断版** | `node tools/check-level-script.mjs` → 看 `xuehuang-diag-w1` 那一行；`.gil` 里嵌的脚本是**保存关卡那一刻的副本**，改了文件不保存 = 没生效 |
+| 日志判据（全 ASCII） | `[DIAG] tag=… on=… forceWrite=…` / `[WERR] tag=… ctrl=… val=… err=…` / `[WERR-CACHE] …` / `[WERR-SUM] …` / `[BOOT] …` / `[SYNC] afterAct err=…` |
+
+### 8.3 判定表（拿到真机日志后照这个看）
+
+| 日志现象 | 结论 | 下一步 |
+|---|---|---|
+| `[BOOT] bootErr=…` | 启动就抛错 ⇒ `OnUpdate` 每帧提前 return | 按错误修启动路径 |
+| `[SYNC] afterAct err=…` | 刷新函数本身在报错（以前被静默吞掉） | 修 `V.sync` |
+| `[WERR] … err=integer expected` | 字号写了非整数 | 取整（`view.setStyle` 是唯一没护栏的点） |
+| `[WERR-CACHE] …` | **确诊缓存投毒** | 写入失败时不要更新缓存 |
+| 只有 `[WERR]`、无 `[WERR-CACHE]`、画面也不动 | 写入在失败但未闭环 | 先修那个 `tag`/`ctrl` |
+| 一条错误都没有 + 画面仍不动 + `forceWrite=1` 也无效 | 真机确有未知规则 | 原样日志 + 产物交作者逐帧比对 |
+
+`forceWrite=1` 是判定的关键一刀：画面恢复 ⇒ 病在缓存；仍不动 ⇒ 病在写入本身/目标控件。
+
+### 8.4 回退
+
+```bash
+git checkout -- lua/src/view.lua lua/src/host.lua lua/src/xuehuang.lua tools/check-level-script.mjs
+rm lua/src/diag.lua
+# 关卡里的脚本要还原成线上版：把 dist/diag-w1-backup/<时间戳>/xuehuang.lua.before 放回
+#   .../Beyond_Local_Save_Level/1073741825/external_lua_file/xuehuang.lua，再在编辑器里重新导入 + 保存关卡
+```
+> 另存一份完整改动补丁：`diag-write-path/w1-改动.patch`（可 `git apply` 复原）。
+
+### 8.5 ★★ 本地已经把"缓存投毒"复现出来了（2026-10-01 晚，`probe-bundle` 90 行日志）
+
+```
+[DIAG] tag=xuehuang-diag-w1 on=true forceWrite=false
+[BOOT] ok
+[WERR] tag=view.setText ctrl=HudTip val=<非法 UTF-8> err=cannot convert invalid utf8 to javascript string
+[WERR-EMIT] raw-print failed; ascii-only above          ← 诊断自己的 emit 一度把这条吞掉了
+[WERR-CACHE] tag=view.setText ctrl=HudTip skipped=1 lastErr=cannot convert invalid utf8 ...
+```
+
+**根因（我们自己的代码，不是平台）**：
+
+| 位置 | 代码 | 后果 |
+|---|---|---|
+| `view.lua:736-737` | `st.name:sub(1, 2)`（`st.name` 是中文，如 `捣锤区`） | `string.sub` 是**按字节**切的 ⇒ 切出半个汉字 ⇒ 字符串里带**非法 UTF-8 字节** |
+
+写 `HudTip` 的值形如 `现在能按：H \xE6\x8D`（尾部 2 字节是半个 `捣`）⇒ 赋值时报错被 `pcall` 吞掉，
+而 `txtCache` **已经记成"写过了"** ⇒ 下一帧同值直接被缓存跳过（`[WERR-CACHE]`）⇒ **这一行永久停住**。
+这正是作者假设 A 的机制，**在本地第一次拿到了确凿的、可复现的实例**。
+
+⚠️ 本轮**不修**（纪律：一次只改一个变量，先让真机说话）。真机跑完再看：
+- 真机若也报（`[WERR] ... ctrl=HudTip`）⇒ 就是它，改成"按字符取前 2 个汉字"（如 `st.short`）；
+- 真机若不报但提示行显示乱码/豆腐块 ⇒ 平台**不报错但画不出来**，同样要修这一处。
+
+> 另一处同类字节切：`cup_tri_demo.lua:76` 的 `txt:sub(1, 6)`（演示脚本，非线上路径）。
+> `view.lua` 的 `clip()` 是**按字符宽度**推进的，安全，可作为正确写法参考。

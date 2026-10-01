@@ -13,6 +13,7 @@
 --   ③ `game` 的全局函数用**点号**调用（冒号会多传隐式 game 实参）
 --   ④ 运行期只改属性，不新建/销毁（模板子节点不能动态创建）→ 一律控件池
 
+local D = require('diag')      -- ★ 诊断构建才存在；回退时一并删除
 local H = {}
 
 -- ── 日志：不依赖控件的通道（诊断必须走 print）──
@@ -404,28 +405,28 @@ function H.fitText(c, size, w)
   size = math.floor((tonumber(size) or 20) + 0.5)
   local h = size * 2
   if h < 24 then h = 24 end
-  pcall(function() c:SetSizeDelta(w or (size * 12), h) end)
-  pcall(function() c.fontSize = size end)
+  D.try('host.fitText.size', c, size, function() c:SetSizeDelta(w or (size * 12), h) end)
+  D.try('host.fitText.font', c, size, function() c.fontSize = size end)
   return c
 end
 
 -- 改属性的小工具（一律 pcall 包住：某个字段在某个控件上不支持时不要炸整帧）
 function H.setPos(c, x, y)
-  if c then pcall(function() c:SetAnchoredPosition(x, y) end) end
+  if c then D.try('host.setPos', c, x, function() c:SetAnchoredPosition(x, y) end) end
   return c
 end
 function H.setSize(c, w, h)
-  if c then pcall(function() c:SetSizeDelta(w, h) end) end
+  if c then D.try('host.setSize', c, w, function() c:SetSizeDelta(w, h) end) end
   return c
 end
 function H.setColor(c, r, g, b, a)
   if c then
-    pcall(function() c.imageColor = Color.FromRGBA(r, g, b, a or 255) end)
+    D.try('host.setColor', c, r, function() c.imageColor = Color.FromRGBA(r, g, b, a or 255) end)
   end
   return c
 end
 function H.setText(c, s)
-  if c then pcall(function() c.text = tostring(s) end) end
+  if c then D.try('host.setText', c, s, function() c.text = tostring(s) end) end
   return c
 end
 -- ★★ 文字样式：**默认什么都不设**，用文本框模板里编辑器配好的字号/颜色。
@@ -439,8 +440,8 @@ function H.setFont(c, size, r, g, b, a)
   --   我们的字号理论上都是整数，但"乘过缩放"之后就可能是 23.56 这种 —— 一律取整。
   if type(size) == 'number' then size = math.floor(size + 0.5) end
   if not H.forceTextStyle then return c end
-  pcall(function() c.fontSize = size end)
-  if r then pcall(function() c.fontColor = Color.FromRGBA(r, g, b, a or 255) end) end
+  D.try('host.setFont.size', c, size, function() c.fontSize = size end)
+  if r then D.try('host.setFont.color', c, r, function() c.fontColor = Color.FromRGBA(r, g, b, a or 255) end) end
   return c
 end
 -- 文字控件的"用颜色显隐"：把 fontColor 的 alpha 设 0/255
@@ -461,7 +462,7 @@ function H.setAlpha(c, a)
     end)
     base = { r, g, b }
   end
-  pcall(function() c.fontColor = Color.FromRGBA(base[1], base[2], base[3], a or 255) end)
+  D.try('host.setAlpha.color', c, a, function() c.fontColor = Color.FromRGBA(base[1], base[2], base[3], a or 255) end)
 end
 
 -- 记住颜色（setFont/setStyle 时调），供 setAlpha 恢复用
@@ -481,16 +482,16 @@ end
 function H.show(c, on)
   if not c then return end
   if on then
-    pcall(function() c.active = true end)
-    pcall(function() c:SetVisible(true) end)
+    D.try('host.show.active', c, true, function() c.active = true end)
+    D.try('host.show.visible', c, true, function() c:SetVisible(true) end)
   else
-    pcall(function() c:SetVisible(false) end)
+    D.try('host.show.visible', c, false, function() c:SetVisible(false) end)
   end
 end
 -- ★ 隐藏：**只**设 visible=false（可逆）；绝不下 active=false
 H.hide = function(c)
   if not c then return end
-  pcall(function() c:SetVisible(false) end)
+  D.try('host.hide.visible', c, false, function() c:SetVisible(false) end)
 end
 
 -- 颜色快捷（RGB）

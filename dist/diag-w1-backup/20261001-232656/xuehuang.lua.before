@@ -1,0 +1,2672 @@
+﻿-- ==== 自动合成（铺平形态），请勿手改 ====
+-- 源：lua/src/*.lua　　生成：node tools/lua-test.mjs --entry=xuehuang --out=<文件>
+-- 每个模块一个独立作用域 + 结果缓存；入口源码铺在同一层（生命周期函数必须是全局）
+do
+local __c_config, __m_config
+local __c_day, __m_day
+local __c_game, __m_game
+local __c_host, __m_host
+local __c_input, __m_input
+local __c_kitchen, __m_kitchen
+local __c_order, __m_order
+local __c_recipes, __m_recipes
+local __c_state, __m_state
+local __c_view, __m_view
+__m_config = function()
+  if __c_config ~= nil then return __c_config end
+  __c_config = (function()
+-- config.lua —— 雪皇的后厨 · 所有数值的唯一来源
+--
+-- 为什么单独一个文件：网页版那 2900 行里最痛的经验是"同一个数散在三处"，
+-- 改了一处另一处没改，表现就是"改了没反应"。所以千星版从第一天起：
+--   **任何会被调的数字都只写在这里**，别的文件一律 require 这份。
+--
+-- 平台约束（真机实测，别踩）：
+--   · 整数是 32 位（不要写需要 64 位整数的运算）
+--   · 画布 1815x900 是 PC；2D 布局基线是手机 16:9（1280x720），表现层按它构图再等比缩放
+--   · require 按路径 '子目录/文件名'（无 .lua 后缀）
+
+local CFG = {}
+
+-- ── 玩法模式：每个模式自带"几天 / 每天多久"，总时长 = days x perDay ──
+--   arriveScale = 本盘的"人数密度"（1 = 基准）；短盘时间少，所以把人数也降下来
+--   quick = 5 分钟一口气一天（没有日结打断）
+CFG.modes = {
+  quick = { days = 1, perDay = 300,  arriveScale = 1.45, label = '5 \229\136\134\233\146\159\229\177\128',  desc = '\228\184\128\229\143\163\230\176\148\231\187\143\232\144\165 5 \229\136\134\233\146\159' },
+  fast  = { days = 5, perDay = 120,  arriveScale = 1.00, label = '10 \229\136\134\233\146\159\229\177\128', desc = '\230\175\143\229\164\169 2 \229\136\134\233\146\159' },
+  slow  = { days = 5, perDay = 240,  arriveScale = 1.00, label = '20 \229\136\134\233\146\159\229\177\128', desc = '\230\175\143\229\164\169 4 \229\136\134\233\146\159' },
+}
+CFG.defaultMode = 'fast'
+
+-- ── 后厨容量：同时**未完成的任务（杯）** ≤ maxWip；等候区最多 maxWaiting 位 ──
+--   ★ 关键规则：同一张单的几杯**一起进池**（按单填池），不能"第一杯开工就把同单第二杯挤出去"
+CFG.kitchen = { maxWip = 3, maxWaiting = 10 }
+
+-- ── 到店：每次间隔在 [min,max] 内随机 → 到店时间天然动态；dayScale 逐日收紧 ──
+--   closing.rampFrom：当天剩余进入最后这个比例后，到店间隔被逐渐拉长（最多 xrampTo）
+--   closing.graceSec：打烊后的"清场"宽限期硬上限（这段时间耐心**冻结**）
+CFG.arrive = { first = 2.5, min = 8, max = 14, dayScale = 0.95, jitter = 0.2 }
+CFG.closing = { rampFrom = 0.35, rampTo = 4, graceSec = 45 }
+
+-- ── 点单 ──
+--   cups：杯数的加权分布（加权查表就够，不需要复杂随机）
+--   ice/sugar：同上
+CFG.cups  = { { n = 1, p = 0.50 }, { n = 2, p = 0.25 }, { n = 3, p = 0.125 }, { n = 4, p = 0.125 } }
+CFG.ice   = { { v = '\230\173\163\229\184\184', p = 0.75 }, { v = '\229\142\187\229\134\176', p = 0.125 }, { v = '\229\184\184\230\184\169', p = 0.125 } }
+CFG.sugar = { { v = '\230\173\163\229\184\184\231\179\150', p = 0.75 }, { v = '\228\184\131\229\136\134\231\179\150', p = 0.125 }, { v = '\228\186\148\229\136\134\231\179\150', p = 0.125 } }
+
+-- ── 混点：一单可以同款多杯，也可以多种不同 ──
+--   mixedChance2/3：2 杯 / 3 杯以上时"混点"的概率
+--   twoHeavyBan：不允许把两个"重活"放同一单（干冰 + 重活 = 二十多下连按，那是惩罚不是玩法）
+CFG.mix = { mixedChance2 = 0.50, mixedChance3 = 0.65 }
+
+-- ── 耐心：按"这一单点了几杯"动态给（杯数越多，客人愿意等越久）──
+--   waitDrain：排队的掉得慢一档；readyDrain：做完了只是没交的掉得更慢
+--   doneBonus/perStep/doneBonusMax：**每做完一杯给客人续一点耐心**（进度本身就是补偿）
+CFG.patience = {
+  base = 38, perCup = 12, min = 26, jitter = 0.15,
+  doneBonus = 3, perStep = 0.4, doneBonusMax = 8,
+  waitDrain = 0.6, readyDrain = 0.35,
+}
+
+-- ── 时间流速：积压 → 慢，空闲 → 快；均值 ≈ 1，所以总时长仍锁在 days x perDay ──
+CFG.flow = { base = 0.85, backlogGain = 0.05, backlogMax = 6, idleBonus = 0.4, idleAfter = 8, min = 0.5, max = 1.6 }
+
+-- ── 钱与评分 ──
+CFG.money = { perCup = 26, rushBonus = 12, strikePenalty = 18, leavePenalty = 30, comboStep = 2, comboMax = 30 }
+CFG.score = { perCup = 100, rushBonus = 40, mistake = 60, leave = 80, flowWeight = 0.8 }
+-- 房租：每天固定 100；欠款从最终结算里扣，并按每 debtPerRank 元降一档评级
+CFG.rent  = { perDay = 100, debtPerRank = 100 }
+-- 评级档位（分数从高到低）
+CFG.ranks = { { min = 34000, r = 'S' }, { min = 24000, r = 'A' }, { min = 15000, r = 'B' }, { min = 8000, r = 'C' }, { min = 0, r = 'D' } }
+
+-- ── 手法（tap/mash/hold）与"不占名额的纯手感步骤" ──
+CFG.hold = { sec = 0.9 }          -- 按住类要按满多少秒
+CFG.taps = { 4, 5, 6 }            -- 连按类每步的档位（按配方难度取）
+
+-- ── 自动（可关）──
+--   auto.on：小票自动流转（某一步长时间没人管，自动送去该去的工位）
+--   autoTicket.on：客人一进后厨，这单每杯立刻出票（不用手动起杯）
+CFG.auto = { on = true, after = 5 }
+CFG.autoTicket = { on = true, maxPerOrder = 8 }
+
+-- ── 界面（表现层用；逻辑层不读，但放这里省得两处对不上）──
+CFG.ui = {
+  designW = 1280, designH = 720,      -- 2D 布局基线（手机 16:9），PC 上等比放大
+  stallWarn = 3.0,                    -- 小票在某工位停留超过这么久就闪
+}
+
+-- 取某个模式的完整配置（含总时长）
+function CFG.mode(name)
+  local m = CFG.modes[name] or CFG.modes[CFG.defaultMode]
+  return {
+    key = name or CFG.defaultMode,
+    days = m.days, perDay = m.perDay,
+    total = m.days * m.perDay,
+    arriveScale = m.arriveScale,
+    label = m.label, desc = m.desc,
+  }
+end
+
+return CFG
+
+  end)()
+  if __c_config == nil then __c_config = true end
+  return __c_config
+end
+__m_day = function()
+  if __c_day ~= nil then return __c_day end
+  __c_day = (function()
+-- day.lua —— 时间推进 / 到店 / 打烊清场 / 每日结算
+--
+-- 这里有三条**用真机日志和玩家反馈换来的**规则：
+--   ① 到店间隔逐日收紧，且收尾会**越来越稀**（到点直接不放人）—— "快结束时人来的几率减小"
+--   ② 打烊后进入清场：**耐心冻结**，让玩家把手上的做完
+--      （反例：网页版打烊后耐心还在掉 → 客人走到一半没了 → 玩家觉得"打烊后什么都干不了"）
+--   ③ 结算**幂等**：一天只结一次账
+--      （反例：网页版每帧重复结算 → 房租被反复扣、欠租几秒滚成几千）
+
+local CFG = __m_config()
+local R = __m_recipes()
+local S = __m_state()
+local O = __m_order()
+local K = __m_kitchen()
+
+local D = {}
+
+local function pickWeighted(tbl, u) return R.pickWeighted(tbl, u) end
+
+-- 时间流速：积压 → 慢，空闲 → 快；均值 ≈ 1（总时长仍锁在 days × perDay）
+local function updateFlow(s, dtReal)
+  local backlog = 0
+  for _, sl in ipairs(s.slips) do if not sl.ready then backlog = backlog + 1 end end
+  s.backlog = backlog
+  local busy = (#s.orders > 0) or (backlog > 0)
+  if busy then s.idle = 0 else s.idle = s.idle + dtReal end
+  local F = CFG.flow
+  local target = F.base + math.min(backlog, F.backlogMax) * F.backlogGain
+  if s.idle > F.idleAfter then target = target + F.idleBonus end
+  if (not busy) and #s.orders == 0 then target = math.min(target, 1.0) end
+  s.flow = s.flow + (target - s.flow) * math.min(1, dtReal * 1.5)
+  s.flow = math.max(F.min, math.min(F.max, s.flow))
+  return s.flow
+end
+
+-- 到店：算"现在多久来一个"（含收尾减速），不动状态（方便测试）
+function D.arriveInterval(s)
+  local A = CFG.arrive
+  local scale = A.dayScale ^ (s.day - 1)
+  local base = A.min + math.random() * (A.max - A.min)
+  base = base * scale * (s.mode.arriveScale or 1)
+  local jit = 1 + (math.random() * 2 - 1) * A.jitter
+  return math.max(1.5, base * jit)
+end
+
+-- 收尾减速倍率：当天剩余进入最后 rampFrom 比例后，间隔被逐渐拉长（最多 ×rampTo）
+function D.slowFactor(s)
+  local CL = CFG.closing
+  local frac = S.dayFrac(s)
+  if frac >= CL.rampFrom then return 1 end
+  local r = math.min(1, (CL.rampFrom - frac) / CL.rampFrom)
+  return 1 + (CL.rampTo - 1) * r * r          -- 二次曲线：越到后面掉得越快
+end
+
+-- 推进一步。返回本帧发生的事件列表（供表现层弹提示）
+function D.tick(s, dtReal)
+  local ev = {}
+  if s.ended or s.phase == 'done' then return ev end
+  if s.settling then return ev end            -- 正在结算：整段打烊逻辑冻结
+
+  local dt = dtReal * updateFlow(s, dtReal)
+  s.t = s.t + dtReal
+  s.totalLeft = math.max(0, s.totalLeft - dt)
+  s.dayLeft = math.max(0, s.dayLeft - dt)
+
+  -- ── 到店 ──
+  if s.phase == 'closing' or s.dayLeft <= 0 then
+    -- 打烊了：不再放人
+  else
+    local slow = D.slowFactor(s)
+    s.nextArrive = s.nextArrive - dt / slow
+    if s.nextArrive <= 0 and #s.orders < CFG.kitchen.maxWaiting + 4 then
+      local o = O.spawn(s)
+      s.nextArrive = D.arriveInterval(s)
+      ev[#ev + 1] = { kind = 'arrive', o = o }
+    end
+    if slow > 1.6 and s.lastCallDay ~= s.day then
+      s.lastCallDay = s.day
+      ev[#ev + 1] = { kind = 'lastcall' }
+    end
+  end
+
+  -- ── 名额池 + 耐心 ──
+  K.refreshSlots(s)
+  local P = CFG.patience
+  local closingNow = (s.phase == 'closing')
+  for i = #s.orders, 1, -1 do
+    local o = s.orders[i]
+    if o.status ~= 'done' and not closingNow then   -- ★ 清场期间耐心冻结
+      local drain = (not o.inProgress) and P.waitDrain or (o.status == 'ready' and P.readyDrain or 1)
+      o.pat = o.pat - dt * drain
+      if o.pat <= 0 then
+        O.leave(s, o, not o.inProgress)
+        ev[#ev + 1] = { kind = 'leave', o = o }
+      end
+    end
+  end
+
+  K.tickHolds(s, dt)
+  K.sweepZombieSlips(s)
+  K.autoForward(s, dtReal, true)
+
+  -- ── 打烊流程 ──
+  if s.phase ~= 'closing' and s.dayLeft <= 0 then
+    s.phase = 'closing'
+    s.closingLeft = CFG.closing.graceSec
+    ev[#ev + 1] = { kind = 'closing' }
+  end
+  if s.phase == 'closing' then
+    local pending = {}
+    for _, o in ipairs(s.orders) do
+      local allDone = true
+      for _, c in ipairs(o.cups) do if not c.made then allDone = false end end
+      if not allDone then pending[#pending + 1] = o end
+    end
+    s.closingLeft = s.closingLeft - dtReal
+    if (#pending == 0 or s.closingLeft <= 0) and not s.settling then
+      s.settling = true
+      if #pending > 0 then
+        -- ★ 宽限期到了：**已经动过手的单直接算你完成**（别让玩家做掉的白费），
+        --   只有"压根没开工"的才算流失 —— 惩罚的是"没动手"，不是"手慢"。
+        for _, o in ipairs(pending) do
+          if o.inProgress or (o.made or 0) > 0 then
+            for _, c in ipairs(o.cups) do
+              if not c.done then
+                c.done = true
+                for _, st in ipairs(c.steps) do st.ok = true end
+              end
+            end
+            O.finish(s, o, s.t)
+          else
+            s.left = s.left + 1; s.today.left = s.today.left + 1
+            for i = #s.orders, 1, -1 do if s.orders[i] == o then table.remove(s.orders, i) end end
+          end
+        end
+        s.slips = {}
+        ev[#ev + 1] = { kind = 'graceout' }
+      end
+      D.settle(s)
+      ev[#ev + 1] = { kind = 'dayend', day = s.day }
+      return ev
+    end
+  end
+
+  s.today.flow = s.flow
+  return ev
+end
+
+-- 结算（幂等：一天只结一次）
+function D.settle(s)
+  if s.settledDay == s.day then return false end
+  s.settledDay = s.day
+  local rent = CFG.rent.perDay
+  s.rentPaid = s.rentPaid + rent
+  local paid = s.money >= rent
+  if paid then
+    s.money = s.money - rent
+  else
+    s.rentDebt = s.rentDebt + (rent - s.money)
+    s.money = 0
+  end
+  local rec = { day = s.day, served = s.today.served, money = s.today.money,
+                left = s.today.left, mistakes = s.today.mistakes,
+                rent = rent, paid = paid, debt = s.rentDebt }
+  s.dayStats[#s.dayStats + 1] = rec
+  s.log[#s.log + 1] = string.format('\231\172\172 %d \229\164\169\239\188\154\229\135\186\233\164\144 %d \230\157\175 / \232\144\165\228\184\154\233\162\157 %d / \230\181\129\229\164\177 %d / \231\191\187\232\189\166 %d \226\134\146 \230\136\191\231\167\159 %d %s',
+    rec.day, rec.served, rec.money, rec.left, rec.mistakes, rent, paid and '\229\183\178\228\187\152' or ('\230\172\160\231\188\180(\231\180\175\232\174\161 ' .. s.rentDebt .. ')'))
+  if s.day >= s.mode.days then
+    D.endGame(s)
+    return true
+  end
+  s.settling = true          -- 等表现层"继续"→ nextDay
+  return true
+end
+
+-- 下一天
+function D.nextDay(s)
+  s.settling = false
+  s.phase = 'open'
+  s.day = s.day + 1
+  s.dayLeft = s.mode.perDay
+  s.today = { served = 0, money = 0, left = 0, mistakes = 0 }
+  s.nextArrive = CFG.arrive.first
+  return s.day
+end
+
+-- 收工：算总分与评级
+function D.endGame(s)
+  s.ended = true
+  s.phase = 'done'
+  for _, o in ipairs(s.orders) do s.left = s.left + 1; s.today.left = s.today.left + 1 end
+  s.orders = {}; s.slips = {}
+  local acc = (s.served + s.left) > 0 and (s.served / (s.served + s.left)) or 0
+  local flowScore = math.floor(acc * 100 * CFG.score.flowWeight)
+  local debt = s.rentDebt
+  local total = math.max(0, s.score + flowScore + s.money - debt)
+  local rank = 'D'
+  for _, r in ipairs(CFG.ranks) do
+    if total >= r.min then rank = r.r; break end
+  end
+  -- 欠租降档：每 debtPerRank 元降一档
+  local steps = math.min(4, math.floor(debt / math.max(1, CFG.rent.debtPerRank)))
+  local ORDER = { 'S', 'A', 'B', 'C', 'D' }
+  if steps > 0 then
+    local idx = 1
+    for i, x in ipairs(ORDER) do if x == rank then idx = i end end
+    rank = ORDER[math.min(#ORDER, idx + steps)]
+  end
+  s.result = { rank = rank, total = total, score = s.score, flowScore = flowScore,
+               money = s.money, debt = debt, downgraded = steps, acc = acc }
+  return s.result
+end
+
+return D
+
+  end)()
+  if __c_day == nil then __c_day = true end
+  return __c_day
+end
+__m_game = function()
+  if __c_game ~= nil then return __c_game end
+  __c_game = (function()
+-- game.lua —— 主循环与生命周期（这一层是逻辑层的主循环；真机入口是 hello.lua）
+--
+-- 三条真机契约（都在注释里写死，避免以后有人"顺手优化"回去）：
+--   ① 建控件必须在 OnStart 及之后：`game.InstantiateClientUIControl` 在 **OnInit 返回 nil**
+--      （网页版前身踩过：在 OnInit 建控件 → 全 nil → 连报错提示都建不出来 → 白屏且无提示）
+--   ② 不调 `script:EnableUpdate(true)` 就**永远收不到 OnUpdate**（逐帧是命脉）
+--   ③ `game` 的全局函数用**点号**调用（`game.GetUICanvasSize()`），冒号会多传隐式实参
+
+local CFG = __m_config()
+local R = __m_recipes()
+local S = __m_state()
+local O = __m_order()
+local K = __m_kitchen()
+local D = __m_day()
+
+local G = {}
+
+-- 不依赖控件的日志通道（诊断必须走 print，否则"控件建不出来"时什么都看不到）
+local function fmt(f, ...)
+  if type(f) ~= 'string' then return tostring(f) end
+  local args, ai, out = { ... }, 1, {}
+  local i = 1
+  while true do
+    local s, e = string.find(f, '%%[-+ #0]*%d*%.?%d*[sdf]', i)
+    if not s then out[#out + 1] = string.sub(f, i); break end
+    out[#out + 1] = string.sub(f, i, s - 1)
+    local v = args[ai]; ai = ai + 1
+    out[#out + 1] = (v == nil) and '(nil)' or tostring(v)
+    i = e + 1
+  end
+  return table.concat(out)
+end
+local function say(...)
+  local ok, line = pcall(fmt, ...)
+  if not ok then line = tostring((...)) end
+  if print then pcall(print, '[\233\155\170\231\154\135] ' .. line) end
+end
+G.say = say
+G.fmt = fmt
+
+G.BUILD = 'xuehuang-core 2026-09-26 c1'
+
+-- 回调表：表现层 subscribe（这样逻辑层不认识 UI，反过来 UI 只收事件）
+G.listeners = {}
+function G.on(evt, fn) G.listeners[evt] = G.listeners[evt] or {}; table.insert(G.listeners[evt], fn) end
+function G.emit(evt, payload)
+  local l = G.listeners[evt]
+  if not l then return end
+  for _, fn in ipairs(l) do
+    local ok, e = pcall(fn, payload)
+    if not ok then say('\231\155\145\229\144\172 %s \229\135\186\233\148\153\239\188\154%s', evt, tostring(e)) end
+  end
+end
+
+-- 开一局
+function G.newGame(modeName)
+  G.s = S.new(modeName or CFG.defaultMode)
+  say('\229\188\128\230\150\176\229\177\128\239\188\154%s\239\188\136%d \229\164\169 \195\151 %d \231\167\146 = %d \231\167\146\239\188\140\228\186\186\230\149\176\229\175\134\229\186\166 \195\151%s\239\188\137',
+      G.s.mode.label, G.s.mode.days, G.s.mode.perDay, G.s.mode.total, tostring(G.s.mode.arriveScale))
+  return G.s
+end
+
+-- 推进一步（表现层每帧调它；测试也能直接推）
+--   dtReal：真实经过秒数
+function G.tick(dtReal)
+  local s = G.s
+  if not s or s.ended then return end
+  local ev = D.tick(s, dtReal)
+  if ev then
+    for _, e in ipairs(ev) do
+      if e.kind == 'arrive' then
+        say('%s \232\166\129 %s %s %s', e.o.name, e.o.makeup, e.o.ice, e.o.sugar)
+      elseif e.kind == 'leave' then
+        say('%s \232\181\176\228\186\134\239\188\136\232\128\144\229\191\131\232\128\151\229\176\189\239\188\137', e.o.name)
+      elseif e.kind == 'lastcall' then
+        say('\230\156\128\229\144\142\230\142\165\229\141\149\239\188\154\228\185\139\229\144\142\228\184\141\229\134\141\230\148\190\228\186\186\232\191\155\230\157\165\239\188\140\230\137\139\228\184\138\231\154\132\229\129\154\229\174\140\229\176\177\230\148\182\230\145\138')
+      elseif e.kind == 'closing' then
+        say('\230\137\147\231\131\138\239\188\154\228\184\141\229\134\141\230\142\165\229\190\133\230\150\176\233\161\190\229\174\162')
+      elseif e.kind == 'graceout' then
+        say('\230\184\133\229\156\186\229\174\189\233\153\144\230\156\159\229\136\176\239\188\154\229\183\178\231\187\143\229\138\168\232\191\135\230\137\139\231\154\132\229\141\149\231\174\151\228\186\164\228\187\152\239\188\140\230\178\161\229\188\128\229\183\165\231\154\132\232\174\176\230\181\129\229\164\177')
+      end
+      G.emit(e.kind, e)
+    end
+  end
+end
+
+-- 玩家动作：在某工位按一下
+--   返回 { ok=bool, why=string, done=bool }
+function G.act(stationId, kind, slipId)
+  local s = G.s
+  if not s or s.ended then return { ok = false, why = '\232\191\152\230\178\161\229\188\128\233\151\168' } end
+  -- 找出这个工位上"能动的那张票"（优先指定 id，否则队列里第一张能做的）
+  local function workable(sl)
+    local nx = S.nextStep(sl.cup)
+    if stationId == 'pack' then return sl.ready or (nx and nx.st == 'pack') end
+    return (not sl.ready) and nx ~= nil and nx.st == stationId
+  end
+  local sl
+  if slipId then
+    for _, x in ipairs(s.slips) do if x.id == slipId and workable(x) then sl = x end end
+  end
+  if not sl then for _, x in ipairs(s.slips) do if workable(x) then sl = x; break end end end
+  if not sl then return { ok = false, why = '\232\191\153\228\184\170\229\183\165\228\189\141\230\154\130\230\151\182\230\178\161\230\156\137\232\131\189\229\129\154\231\154\132\229\176\143\231\165\168' } end
+
+  local nx = S.nextStep(sl.cup)
+  if stationId == 'pack' and sl.ready then
+    local okk, why = K.deliverCup(s, sl)
+    return { ok = okk, why = why }
+  end
+  if not nx then return { ok = false, why = '\232\191\153\230\157\175\229\183\178\231\187\143\229\129\154\229\174\140\228\186\134\239\188\140\233\128\129\230\137\147\229\140\133\229\143\176' } end
+  if nx.st ~= stationId then
+    K.doWrong(s, sl.cup, stationId)
+    return { ok = false, why = string.format('\231\191\187\232\189\166\239\188\129%s \229\129\154\228\184\141\228\186\134\227\128\140%s\227\128\141', stationId, nx.t) }
+  end
+  if kind == 'release' then nx.holdOn = false; return { ok = true } end
+  local r = K.pressStep(s, sl)
+  return { ok = true, done = r.done, step = r.step }
+end
+
+-- 玩家动作：点手册起杯（关掉自动出票后才有用）
+function G.startCup(recId)
+  local rec = R.byId(recId)
+  if not rec then return { ok = false, why = '\230\178\161\230\156\137\232\191\153\228\184\170\228\186\167\229\147\129' } end
+  local okk, why = K.startCup(G.s, rec)
+  return { ok = okk, why = why }
+end
+
+-- 表现层在结算页按"继续"时调
+function G.nextDay()
+  if not G.s then return end
+  if G.s.ended then return end
+  D.nextDay(G.s)
+  G.emit('daystart', { day = G.s.day })
+end
+
+return G
+
+  end)()
+  if __c_game == nil then __c_game = true end
+  return __c_game
+end
+__m_host = function()
+  if __c_host ~= nil then return __c_host end
+  __c_host = (function()
+-- host.lua —— 脚本与"千星客户端控件"打交道的那一层
+--
+-- 职责：**只做"怎么把控件建出来、怎么找到模板"，不管"画什么"**。
+-- 从 hello.lua（M0 的验证脚本）里提炼出来的，那些能力都在真机上验过：
+--   · 双空间扫描控件模板索引（真机索引是大数字，形如 1073741855）
+--   · 解析图片素材号（脚本变量 artImage > ART 表 > 在画布里借一张配好图的控件）
+--   · 隐藏"没配图的图片控件"（引擎会给它画一个"?"）
+--   · 拿画布尺寸、拿挂载根控件
+--
+-- 真机契约（别改回去）：
+--   ① `game.InstantiateClientUIControl` 在 **OnInit 阶段返回 nil** → 建控件必须在 OnStart 及之后
+--   ② 不调 `script:EnableUpdate(true)` 就**收不到 OnUpdate**
+--   ③ `game` 的全局函数用**点号**调用（冒号会多传隐式 game 实参）
+--   ④ 运行期只改属性，不新建/销毁（模板子节点不能动态创建）→ 一律控件池
+
+local H = {}
+
+-- ── 日志：不依赖控件的通道（诊断必须走 print）──
+local function fmt(f, ...)
+  if type(f) ~= 'string' then return tostring(f) end
+  local args, ai, out = { ... }, 1, {}
+  local i = 1
+  while true do
+    local s, e = string.find(f, '%%[-+ #0]*%d*%.?%d*[sdf]', i)
+    if not s then out[#out + 1] = string.sub(f, i); break end
+    out[#out + 1] = string.sub(f, i, s - 1)
+    local v = args[ai]; ai = ai + 1
+    out[#out + 1] = (v == nil) and '(nil)' or tostring(v)
+    i = e + 1
+  end
+  return table.concat(out)
+end
+function H.fmt(...) return fmt(...) end
+function H.say(tag, ...)
+  local ok, line = pcall(fmt, ...)
+  if not ok then line = tostring((...)) end
+  if print then pcall(print, '[' .. tostring(tag or '\233\155\170\231\154\135') .. '] ' .. line) end
+end
+
+function H.param(name, dflt)
+  local v = script and script:GetParam(name)
+  if v == nil then return dflt end
+  return v
+end
+
+-- ★ 图片素材号（资产号）：和"控件模板索引"是两套数字，别混
+--   用户 2026-09-26 从编辑器里点出来的编号
+H.ART = {
+  box      = 100001,   -- 基本方形（底衬通用：工位底板 / 打包台 / 进度条 / 卡片底；可拉伸不糊）
+  roundbox = 100182,   -- 圆角方形（只用于接近正方形的场合；拉长会糊）
+  mark     = 100122,   -- ⚠ 标识
+  back     = 100109,   -- 返回箭头
+  info     = 100115,   -- 详情 i 图标
+}
+
+-- ── 画布 ──
+function H.canvas()
+  local w, h = game.GetUICanvasSize()
+  return w or 1280, h or 720
+end
+
+-- 挂载根控件：脚本挂在客户端控件容器上，子控件就挂在它这棵树上
+function H.root()
+  local r = script and script.object
+  if r then return r end
+  local rs = game.GetClientUIRoots()
+  return rs and rs[1]
+end
+
+-- ── 控件类型判定（typeof 返回运行时类型名）──
+function H.kindOf(c)
+  if not c or not typeof then return '' end
+  local ok, t = pcall(typeof, c)
+  if not ok or not t then return '' end
+  return tostring(t)
+end
+function H.isImage(c) return H.kindOf(c):find('Image', 1, true) ~= nil end
+function H.isText(c) return H.kindOf(c):find('TextBox', 1, true) ~= nil end
+function H.isCursor(c) return H.kindOf(c):find('Cursor', 1, true) ~= nil end
+function H.isContainer(c) return H.kindOf(c):find('Container', 1, true) ~= nil end
+
+-- ── 模板索引自动识别 ──
+--   真机的控件模板索引是**大数字**（和关卡目录同一个 ID 空间，形如 1073741855）。
+--   只扫 1~32 是错的（zuma 和我都为这个白查过一轮）。
+local BASE = 1073741824                 -- 2^30
+local SMALL_MAX, BIG_MAX = 32, 1023
+
+-- 试着用某个索引建一个控件；建出来就按类型归类并**立刻销毁**（探针不占控件预算）
+local function tryPrefab(idx, found, parent)
+  local ok, c = pcall(game.InstantiateClientUIControl, idx, parent)
+  if not ok or not c then return nil end
+  local t = H.kindOf(c)
+  if DestroyClientUIControl then pcall(DestroyClientUIControl, c) end
+  if t:find('Image', 1, true) and not found.img then found.img = idx end
+  if t:find('TextBox', 1, true) and not found.text then found.text = idx end
+  if t:find('Cursor', 1, true) and not found.cursor then found.cursor = idx end
+  if t:find('Container', 1, true) and not found.panel then found.panel = idx end
+  return t
+end
+
+-- 返回 { img=?, text=?, cursor=?, panel=? }
+function H.detectPrefabs(parent)
+  local found, probe = {}, {}
+  for i = 1, SMALL_MAX do
+    local t = tryPrefab(i, found, parent)
+    if t and t ~= '' then probe[#probe + 1] = i .. '=' .. t end
+  end
+  if not (found.img and found.text) then
+    for i = BASE + 1, BASE + BIG_MAX do
+      local t = tryPrefab(i, found, parent)
+      if t and t ~= '' and #probe < 12 then probe[#probe + 1] = i .. '=' .. t end
+      if found.img and found.text and found.cursor then break end
+    end
+  end
+  H.probeLog = probe
+  return found
+end
+
+-- ── 在画布里"借"一个素材号（用户只要在画布里摆一张配好图的控件，脚本就能拿到号）──
+function H.adoptImageId(root)
+  local found, seen = {}, {}
+  local function walk(ctrl, depth)
+    if not ctrl or depth > 4 or seen[ctrl] then return end
+    seen[ctrl] = true
+    local ok, kids = pcall(function() return ctrl:GetChildren() end)
+    if not ok or type(kids) ~= 'table' then return end
+    for i = 1, #kids do
+      local ch = kids[i]
+      local id = nil
+      pcall(function() id = ch.imageId end)
+      -- 只认正整数：0 = 没配图（真机/模拟器都这么给），捡了 0 等于没设 → 全画成"?"
+      if type(id) == 'number' and id > 0 and H.isImage(ch) then
+        found[#found + 1] = { id = id, name = tostring(ch.name), t = H.kindOf(ch) }
+      end
+      walk(ch, depth + 1)
+    end
+  end
+  walk(root, 0)
+  local up = root
+  for _ = 1, 3 do
+    if not up then break end
+    -- ★ `parent` 是**字段**（官方注解：`---@field parent ClientUIBaseControl # 父控件`）。
+    --   我原来写的是 `up:GetParent()` —— 官方注解里**没有这个方法**，真机上会被 pcall 吞掉，
+    --   于是"往上几层找配好图的控件"整段静默失效。本地模拟器恰好有这个方法，所以本地看着是好的。
+    local ok, p = pcall(function() return up.parent end)
+    up = ok and p or nil
+    walk(up, 0)
+  end
+  local okr, roots = pcall(game.GetClientUIRoots)
+  if okr and type(roots) == 'table' then for i = 1, #roots do walk(roots[i], 0) end end
+  return found
+end
+
+-- ── 隐藏"没配图的图片控件"（引擎会给它画一个"?"，而它不在我们控制之内）──
+--   只关没配图的；用户在编辑器里刻意配好图的不动。
+function H.hideBlankImages(root, quiet)
+  local hidden = 0
+  local function walk(c, depth)
+    if not c or depth > 3 then return end
+    local ok, kids = pcall(function() return c:GetChildren() end)
+    if not ok or type(kids) ~= 'table' then return end
+    for i = 1, #kids do
+      local k = kids[i]
+      if H.isImage(k) then
+        local id = nil
+        pcall(function() id = k.imageId end)
+        if id == nil or id == 0 then
+          pcall(function() k:SetVisible(false) end)
+          local ok2 = pcall(function() k:SetActive(false) end)
+          if ok2 then hidden = hidden + 1 end
+        end
+      end
+      walk(k, depth + 1)
+    end
+  end
+  walk(root, 0)
+  if not quiet and hidden > 0 then H.say('host', '\233\154\144\232\151\143\228\186\134 %s \228\184\170\230\178\161\233\133\141\229\155\190\231\154\132\229\155\190\231\137\135\230\142\167\228\187\182\239\188\136\229\174\131\228\187\172\228\188\154\232\162\171\231\148\187\230\136\144"?"\239\188\137', hidden) end
+  return hidden
+end
+
+-- ── 一次性初始化：模板索引 + 素材号 + 枚举 ──
+--   返回 hostCfg：{ img=索引, text=索引, cursor=索引, panel=索引, art=素材号, src=图片来源 }
+function H.setup(root)
+  local cfg = {}
+  cfg.root = root
+  cfg.canvasW, cfg.canvasH = H.canvas()
+
+  local w, h = cfg.canvasW, cfg.canvasH
+  H.say('host', 'BUILD=%s canvas=%sx%s', 'xuehuang-core', tostring(w), tostring(h))
+
+  -- ★★ 挂载点（客户端控件容器）：**只激活，不要动它的尺寸！**
+  --   我原来无条件 `root:SetSizeDelta(画布宽, 画布高)`（抄 zuma 的"容器 0x0 会被裁掉"经验），
+  --   但用户的容器是**锚点拉满式**布局（Min(0,0) / Max(1,1) / 中心(0.5,0.5)，1600x900 居中），
+  --   对锚点拉满的控件强行改 sizeDelta 会触发重新布局 → **整块 UI 被推歪**
+  --   （用户截图里 UI 偏右偏上、订单栏被切，就是这个造成的）。
+  --   现在只在"容器小得离谱"时才补尺寸，正常情况一个字都不碰。
+  pcall(function() root:SetActive(true) end)
+  do
+    local cw, ch = nil, nil
+    pcall(function() cw, ch = root:GetSizeDelta() end)
+    if type(cw) ~= 'number' or cw < 8 or type(ch) ~= 'number' or ch < 8 then
+      local ok, err = pcall(function() root:SetSizeDelta(w, h) end)
+      H.say('host', '\229\174\185\229\153\168\229\176\186\229\175\184\232\191\135\229\176\143\239\188\136%sx%s\239\188\137\226\134\146 \229\133\156\229\186\149\232\174\190\228\184\186 %sx%s -> %s',
+            tostring(cw), tostring(ch), tostring(w), tostring(h), ok and 'ok' or tostring(err))
+    else
+      H.say('host', '\229\174\185\229\153\168\229\176\186\229\175\184\230\173\163\229\184\184\239\188\136%sx%s\239\188\137\226\134\146 \228\184\141\229\138\168\229\174\131\239\188\136\233\148\154\231\130\185\230\139\137\230\187\161\231\154\132\229\174\185\229\153\168\230\148\185\228\186\134\228\188\154\230\142\168\230\173\170\230\149\180\229\157\151 UI\239\188\137',
+            tostring(cw), tostring(ch))
+    end
+  end
+  -- ★★ 光标常驻（官方 API：ContainerControl.showCursor "是否显示常驻光标；
+  --   **CursorEvent 相关方法都需设置该参数为真后才可正常使用**"）。
+  --   不设它，玩家要**按住 Alt** 才看得见光标。编辑器里等价开关：容器节点控件 → 功能设置 → 显示常驻光标。
+  do
+    local ok, err = pcall(function() root.showCursor = true end)
+    H.say('host', '\230\152\190\231\164\186\229\184\184\233\169\187\229\133\137\230\160\135 showCursor=true -> %s%s', ok and 'ok' or '\229\164\177\232\180\165\239\188\154', ok and '' or tostring(err))
+  end
+
+  -- textStyle=1：允许脚本覆盖字号/颜色（默认不覆盖，用模板里配好的样式）
+  H.forceTextStyle = tonumber(tostring(H.param('textStyle', 0))) ~= 0
+  H.say('host', '\230\150\135\229\173\151\230\160\183\229\188\143\239\188\154%s', H.forceTextStyle and '\232\132\154\230\156\172\232\166\134\231\155\150\229\173\151\229\143\183/\233\162\156\232\137\178' or '\231\148\168\230\168\161\230\157\191\233\187\152\232\174\164\239\188\136\228\184\141\232\166\134\231\155\150\239\188\137')
+
+  do -- __SPACE：把挂载控件的真实位置/尺寸打进日志（坐标系的原点就在这里）
+    local info = H.probeSpace(root)
+    cfg.spaceW = (type(info.cw) == 'number' and info.cw > 1) and info.cw or nil
+    cfg.spaceH = (type(info.ch) == 'number' and info.ch > 1) and info.ch or nil
+    cfg.spaceX, cfg.spaceY = info.cx, info.cy
+    H.say('host', '__SPACE space=%sx%s at (%s,%s)',
+          tostring(cfg.spaceW), tostring(cfg.spaceH), tostring(cfg.spaceX), tostring(cfg.spaceY))
+    for i = 1, #info.parents do H.say('host', '__SPACE %s', info.parents[i]) end
+  end
+
+  local auto = tonumber(tostring(H.param('autoPrefabs', 1))) ~= 0
+  local found = auto and H.detectPrefabs(root) or {}
+  cfg.img    = H.param('imgPrefab', found.img)
+  cfg.text   = H.param('textPrefab', found.text)
+  cfg.cursor = H.param('cursorPrefab', found.cursor)
+  cfg.panel  = H.param('panelPrefab', found.panel)
+  H.say('host', '\232\135\170\229\138\168\232\174\164\230\168\161\230\157\191\239\188\154img=%s text=%s cursor=%s panel=%s\239\188\136\230\142\167\228\187\182\230\168\161\230\157\191\231\180\162\229\188\149\239\188\1401073741xxx \233\130\163\228\184\178\239\188\137',
+        tostring(found.img), tostring(found.text), tostring(found.cursor), tostring(found.panel))
+  if not cfg.img or not cfg.text then
+    error('\230\178\161\232\174\164\229\135\186\229\191\133\233\156\128\231\154\132\230\142\167\228\187\182\230\168\161\230\157\191\239\188\136img/text\239\188\137\227\128\130\232\175\183\229\156\168\227\128\144\231\149\140\233\157\162\230\142\167\228\187\182\231\187\132\231\174\161\231\144\134 \226\134\146 \231\149\140\233\157\162\230\142\167\228\187\182\231\187\132\229\186\147 \226\134\146 \229\174\162\230\136\183\231\171\175\230\142\167\228\187\182\230\168\161\230\157\191 \226\134\146 '
+      .. '\230\183\187\229\138\160\229\174\162\230\136\183\231\171\175\230\142\167\228\187\182 \226\134\146 \229\173\152\228\184\186\230\168\161\230\157\191\227\128\145\233\135\140\229\187\186"\229\155\190\231\137\135\230\142\167\228\187\182"\229\146\140"\230\150\135\230\156\172\230\161\134\230\142\167\228\187\182"\239\188\140\230\136\150\229\156\168\232\132\154\230\156\172\229\143\152\233\135\143\233\135\140\229\161\171 imgPrefab/textPrefab\227\128\130'
+      .. '\239\188\136\231\156\159\230\156\186\231\180\162\229\188\149\230\152\175\229\164\167\230\149\176\229\173\151\239\188\140\229\189\162\229\166\130 1073741855\239\188\137')
+  end
+
+  -- 图片类型：Basic 按原图尺寸画（会显得小），Stretch 铺满控件
+  local okE, e = pcall(function() return Enum.ImageType.Stretch end)
+  cfg.imageTypeStretch = (okE and e) or nil
+  local okE2, e2 = pcall(function() return Enum.ImageType.Basic end)
+  cfg.imageTypeBasic = (okE2 and e2) or nil
+
+  -- 素材号：脚本变量 > ART 表 > 在画布里借
+  -- ★ 素材号可覆盖：脚本变量 artImage
+  --     artImage=0        → **完全不贴图**（控件只填色；排查"深色小块是不是图片"用）
+  --     artImage=100181   → 换别的素材号
+  --     不填              → 用内置 ART.box
+  local artRaw = tostring(H.param('artImage', ''))
+  local artVar = tonumber(artRaw)
+  if artRaw ~= '' and artVar == 0 then
+    cfg.art, cfg.artSrc = nil, '\232\132\154\230\156\172\229\143\152\233\135\143 artImage=0\239\188\136\228\184\141\232\180\180\229\155\190\239\188\140\229\143\170\229\161\171\232\137\178\239\188\137'
+  elseif artVar then
+    cfg.art, cfg.artSrc = artVar, '\232\132\154\230\156\172\229\143\152\233\135\143 artImage=' .. artRaw
+  else
+    cfg.art, cfg.artSrc = H.ART.box, '\229\134\133\231\189\174 ART\239\188\136\229\159\186\230\156\172\230\150\185\229\189\162 ' .. tostring(H.ART.box) .. '\239\188\137'
+  end
+  local cand = H.adoptImageId(root)
+  cfg.borrowed = cand
+  if #cand > 0 then
+    H.say('host', '\231\148\187\229\184\131\233\135\140\233\133\141\229\165\189\229\155\190\231\154\132\230\142\167\228\187\182\239\188\154%s\239\188\136\231\180\160\230\157\144\229\143\183 %s\239\188\137', tostring(cand[1].name), tostring(cand[1].id))
+  end
+  H.say('host', '\231\148\168\231\180\160\230\157\144\229\143\183 = %s\239\188\136\230\157\165\230\186\144\239\188\154%s\239\188\137', tostring(cfg.art), tostring(cfg.artSrc))
+
+  H.hideBlankImages(root, true)
+  return cfg
+end
+
+-- ── 量出挂载控件的真实位置/尺寸（★★ 关键：坐标系的原点是**挂载控件的中心**，
+--   而不是画布中心！用户截图证实：容器在画布右侧、还是竖长的，
+--   于是我按"画布中心为原点"算的所有坐标整体偏右偏上，右侧订单栏还被切掉。
+--   所以必须先问清楚"我这个父控件到底占哪儿"。──
+function H.probeSpace(root)
+  local info = { cw = nil, ch = nil, cx = nil, cy = nil, parents = {} }
+  pcall(function() info.cw, info.ch = root:GetSizeDelta() end)
+  pcall(function() info.cx, info.cy = root:GetAnchoredPosition() end)
+  -- 往上找几层，看有没有更大的容器（挂载点可能不是根）
+  local up, depth = root, 0
+  while up and depth < 4 do
+    local w, h, x, y, nm = nil, nil, nil, nil, nil
+    pcall(function() w, h = up:GetSizeDelta() end)
+    pcall(function() x, y = up:GetAnchoredPosition() end)
+    pcall(function() nm = tostring(up.name) end)
+    info.parents[#info.parents + 1] = string.format('L%s name=%s pos=(%s,%s) size=(%s,%s)',
+      tostring(depth), tostring(nm), tostring(x), tostring(y), tostring(w), tostring(h))
+    local ok, par = pcall(function() return up.parent end)
+    up = ok and par or nil
+    depth = depth + 1
+  end
+  return info
+end
+
+-- ── 建一个控件（运行期只调属性；不要每帧建/销毁）──
+--   cfg：H.setup 的返回值；kind：'img' | 'text'
+function H.spawn(cfg, kind, name)
+  local idx = (kind == 'text') and cfg.text or cfg.img
+  local c = game.InstantiateClientUIControl(idx, cfg.root)
+  if not c then error('\229\187\186\230\142\167\228\187\182\229\164\177\232\180\165\239\188\154kind=' .. tostring(kind) .. ' \231\180\162\229\188\149=' .. tostring(idx)) end
+  pcall(function() c:SetActive(true) end)
+  if name then pcall(function() c.name = name end) end
+  if kind ~= 'text' and cfg.art then
+    local ok = pcall(function() c:SetImage(Enum.ImageSource.StaticReference, cfg.art) end)
+    if ok and cfg.imageTypeStretch then pcall(function() c.imageType = cfg.imageTypeStretch end) end
+  end
+  if kind == 'text' then
+    -- ★★ 文本框模板自带**不透明背景色**（`bgColor`），不关掉的话每个文字后面都会拖一个
+    --   深色小方块 —— 用户看到的"四个深色小块"就是这个（我原以为文本框是透明的）。
+    --   设成全透明，字才能直接落在工位方块上。
+    pcall(function() c.bgColor = Color.FromRGBA(0, 0, 0, 0) end)
+  end
+  return c
+end
+
+-- ── 绘制小工具：一个"带边色的区块" ──
+--   平台没有"描边"字段，边框只能自己画：底 + 一条细色条（色条比底更亮/更饱和）。
+--   这是原神式 UI 的关键做法 —— 深底 + 小面积亮色，而不是大色块铺满。
+--   edge：'top' | 'left' | 'bottom' | nil（无边框）
+function H.spawnBox(cfg, name, x, y, w, h, bg, edge, edgeCol, edgeThick)
+  local box = H.spawn(cfg, 'img', name)
+  H.setPos(box, x, y); H.setSize(box, w, h)
+  if bg then H.setColor(box, bg[1], bg[2], bg[3], bg[4] or 255) end
+  local strip = nil
+  if edge and edgeCol then
+    local t = edgeThick or 5
+    local sw, sh, sx, sy = w, t, x, y
+    if edge == 'top' then sy = y + h / 2 - t / 2
+    elseif edge == 'bottom' then sy = y - h / 2 + t / 2
+    elseif edge == 'left' then sw, sh = t, h; sx = x - w / 2 + t / 2; sy = y
+    elseif edge == 'right' then sw, sh = t, h; sx = x + w / 2 - t / 2; sy = y
+    end
+    strip = H.spawn(cfg, 'img', name .. '_edge')
+    H.setPos(strip, sx, sy); H.setSize(strip, sw, sh)
+    H.setColor(strip, edgeCol[1], edgeCol[2], edgeCol[3], edgeCol[4] or 255)
+  end
+  return box, strip
+end
+
+-- 隐藏一个区块（底 + 它的边条）
+function H.hideBox(box, strip, ...)
+  H.hide(box); H.hide(strip)
+  for _, extra in ipairs({ ... }) do H.hide(extra) end
+end
+
+-- 改属性的小工具（一律 pcall 包住：某个字段在某个控件上不支持时不要炸整帧）
+function H.setPos(c, x, y)
+  if c then pcall(function() c:SetAnchoredPosition(x, y) end) end
+  return c
+end
+function H.setSize(c, w, h)
+  if c then pcall(function() c:SetSizeDelta(w, h) end) end
+  return c
+end
+function H.setColor(c, r, g, b, a)
+  if c then
+    pcall(function() c.imageColor = Color.FromRGBA(r, g, b, a or 255) end)
+  end
+  return c
+end
+function H.setText(c, s)
+  if c then pcall(function() c.text = tostring(s) end) end
+  return c
+end
+-- ★★ 文字样式：**默认什么都不设**，用文本框模板里编辑器配好的字号/颜色。
+--   为什么要这样（真机教训）：我原来每帧都写 fontSize + fontColor，而这两个字段都是
+--   "Tweenable"（带补间），在真机上用脚本反复赋值有可能把模板里配好的样式覆盖成看不见的状态 ——
+--   表现就是"方框（图片控件）都正常、一个字的都不显示"。
+--   需要覆盖时用脚本变量 textStyle=1 打开（那时才写 fontSize/fontColor）。
+function H.setFont(c, size, r, g, b, a)
+  if not c then return c end
+  if not H.forceTextStyle then return c end
+  pcall(function() c.fontSize = size end)
+  if r then pcall(function() c.fontColor = Color.FromRGBA(r, g, b, a or 255) end) end
+  return c
+end
+function H.show(c, on)
+  if not c then return end
+  local v = on and true or false
+  pcall(function() c:SetActive(v) end)
+  pcall(function() c:SetVisible(v) end)
+end
+H.hide = function(c) H.show(c, false) end
+
+-- 颜色快捷（RGB）
+function H.rgb(r, g, b, a) return Color.FromRGBA(r, g, b, a or 255) end
+
+return H
+
+  end)()
+  if __c_host == nil then __c_host = true end
+  return __c_host
+end
+__m_input = function()
+  if __c_input ~= nil then return __c_input end
+  __c_input = (function()
+-- input.lua —— 输入层：按键 + 光标点击
+--
+-- ★★ 真机契约（都是实测/官方枚举里挖出来的，别改回去）：
+--   ① `Enum.KeyEventType` **没有通用 KeyDown/KeyUp**，是**逐键**命名（82 个），
+--      而且官方注解**带默认物理键** —— 这比"猜哪个枚举对应哪个键"可靠得多：
+--        KeyboardCraftspersonKey1..10Key → 数字键 1..9、0
+--        KeyboardJumpKey                → 空格
+--        KeyboardCharacterSkill1..4Key  → E / Q / R / T（**取决于玩家键位设置，不可靠**）
+--        KeyboardMoveLeftKey            → A（WASD 那套）
+--      ⚠️ 我第一版绑的是技能键（1-4 号技能），物理键取决于玩家设置 → 我把它换成了固定的字母/数字键。
+--   ② 回调**没有参数**：注册哪个键就代表哪个键；返回 true = 已处理（同层不再派发）
+--   ③ 光标点击需要两件事：
+--        · 容器 `showCursor = true`（常驻光标，否则要按住 Alt）
+--        · 一个**光标检测区域**控件（`ClientUICursorEventAreaControl`）挂监听
+--      坐标用 `game.GetCursorUIPos()`（官方：光标 **UI 坐标**，左下为原点、y 向上）
+--
+-- 键位（优先选"物理键固定"的）：
+--    捣锤区 1   火系区 H   化学区 K   萃茶区 P    打包台 空格
+--    , 切自动流转   Z 切自动出票   空格/1/2 在结算页=继续
+--   （网页版的 A 键被 WASD 的 A 占了，所以自动流转改到逗号）
+
+local H = __m_host()
+
+local IN = {}
+
+-- 逻辑动作 → 枚举名（不存在就在日志里点名，不让整局崩）
+IN.KEYMAP = {
+  { act = 'shake', cands = { 'KeyboardCraftspersonKey1Down' } },   -- 1
+  { act = 'fire',  cands = { 'KeyboardCraftspersonKey15Down' } },  -- H
+  { act = 'chem',  cands = { 'KeyboardCraftspersonKey20Down' } },  -- K
+  { act = 'brew',  cands = { 'KeyboardCraftspersonKey18Down' } },  -- P
+  { act = 'pack',  cands = { 'KeyboardJumpKeyDown' } },               -- 空格
+  { act = 'auto',  cands = { 'KeyboardCraftspersonKey33Down' } },  -- ,
+  { act = 'ticket', cands = { 'KeyboardCraftspersonKey12Down' } }, -- Z
+}
+
+-- 结算页/菜单页的"确认"键
+IN.CONFIRM = { 'KeyboardJumpKeyDown', 'KeyboardCraftspersonKey1Down', 'KeyboardCraftspersonKey2Down' }
+IN.MODES = { 'quick', 'fast', 'slow' }
+
+IN.bound = {}          -- 已绑定的键（诊断）
+IN.queue = {}          -- 待处理输入
+IN.clicked = nil       -- 最近一次点击的 UI 坐标（左下原点、y 向上）
+
+function IN.push(act, kind)
+  IN.queue[#IN.queue + 1] = { act = act, kind = kind or 'press' }
+end
+
+-- 在控件树里找"光标检测区域"控件
+function IN.findArea(root)
+  local found = nil
+  local function walk(c, depth)
+    if found or not c or depth > 3 then return end
+    if H.kindOf(c):find('CursorEvent', 1, true) then found = c; return end
+    local ok, kids = pcall(function() return c:GetChildren() end)
+    if ok and type(kids) == 'table' then for i = 1, #kids do walk(kids[i], depth + 1) end end
+  end
+  walk(root, 0)
+  return found
+end
+
+function IN.attach(hostCfg, tip)
+  local root = hostCfg.root
+
+  local function exists(name)
+    local ok, v = pcall(function() return Enum.KeyEventType[name] end)
+    return (ok and v ~= nil) and v or nil
+  end
+  local function bind(evName, act, kind)
+    local ev = exists(evName)
+    if ev == nil then H.say('input', '  \233\148\174 %s \228\184\141\229\173\152\229\156\168\239\188\136\232\183\179\232\191\135\239\188\137', tostring(evName)); return false end
+    local ok = pcall(function()
+      root:AddKeyEventListener(ev, function() IN.push(act, kind); return true end)
+    end)
+    if ok then IN.bound[#IN.bound + 1] = act .. '=' .. evName; return true end
+    return false
+  end
+
+  local got = 0
+  for _, m in ipairs(IN.KEYMAP) do
+    if bind(m.cands[1], m.act, 'press') then got = got + 1 end
+    local up = string.gsub(m.cands[1], 'KeyDown$', 'KeyUp')   -- 松手（按住类的收手）
+    if up ~= m.cands[1] then bind(up, m.act, 'release') end
+  end
+  for _, k in ipairs(IN.CONFIRM) do bind(k, 'confirm', 'press') end
+
+  local names = {}
+  pcall(function() for k in pairs(Enum.KeyEventType) do names[#names + 1] = tostring(k) end end)
+  table.sort(names)
+  H.say('input', 'Enum.KeyEventType \229\133\177 %s \228\184\170\230\136\144\229\145\152', tostring(#names))
+  H.say('input', '\229\183\178\231\187\145\229\174\154\239\188\154%s', table.concat(IN.bound, '  '))
+  if got == 0 then H.say('input', '\228\184\128\228\184\170\233\148\174\233\131\189\230\178\161\231\187\145\228\184\138 \226\128\148\226\128\148 \232\167\129\228\184\138\233\157\162\231\154\132\230\136\144\229\145\152\229\144\141\229\136\151\232\161\168') end
+
+  -- 光标点击
+  local area = IN.findArea(root)
+  if area then
+    local ok = pcall(function()
+      area:AddCursorEventListener(Enum.CursorEventType.CursorClick, function()
+        -- ★ 官方只保证 GetCursorUIPos 给坐标；回调参数形状没文档 → 不依赖参数
+        local okp, gx, gy = pcall(game.GetCursorUIPos)
+        if okp and type(gx) == 'number' and type(gy) == 'number' then
+          IN.clicked = { x = gx, y = gy }
+          IN.push('click', 'press')
+        end
+      end)
+    end)
+    H.say('input', '\229\133\137\230\160\135\230\163\128\230\181\139\229\140\186\229\159\159\239\188\154%s\239\188\136\231\130\185\229\135\187\231\155\145\229\144\172 %s\239\188\137', tostring(area.name), ok and 'ok' or '\229\164\177\232\180\165')
+  else
+    H.say('input', '\230\178\161\230\137\190\229\136\176"\229\133\137\230\160\135\230\163\128\230\181\139\229\140\186\229\159\159"\230\142\167\228\187\182 \226\134\146 \231\130\185\229\135\187\230\154\130\230\151\182\231\148\168\228\184\141\228\186\134\239\188\136\230\140\137\233\148\174\231\133\167\229\184\184\239\188\137\227\128\130')
+    H.say('input', '\229\188\128\231\130\185\229\135\187\239\188\154\231\188\150\232\190\145\229\153\168\233\135\140\231\187\153\229\174\185\229\153\168\229\138\160\228\184\128\228\184\170**\229\133\137\230\160\135\230\163\128\230\181\139\229\140\186\229\159\159**\230\142\167\228\187\182\239\188\136\233\147\186\230\187\161\231\148\187\229\184\131\239\188\137')
+  end
+  IN.area = area
+  IN.ready = true
+  return got
+end
+
+-- 每帧把排队的输入交给上层（不在事件回调里改状态：回调里出错不好兜）
+function IN.pump(handlers)
+  local q = IN.queue
+  if not q or #q == 0 then return end
+  IN.queue = {}
+  for _, e in ipairs(q) do
+    if handlers.act then
+      local res = handlers.act(e.act, e.kind)
+      if res and res.why and handlers.tip then handlers.tip(res.why, 1.4) end
+    end
+  end
+end
+
+-- 光标命中测试：点击坐标（画布 UI 坐标，左下原点）→ 换成"相对画布中心"的偏移，
+--   好和控件自己的 anchoredPosition（相对父控件中心）比较。
+function IN.hit(v, ctrl, pad)
+  if not IN.clicked or not ctrl then return false end
+  pad = pad or 0
+  local cx = IN.clicked.x - v.W / 2
+  local cy = IN.clicked.y - v.H / 2
+  local ok, x, y, w, h = pcall(function()
+    return ctrl.anchoredPositionX, ctrl.anchoredPositionY, ctrl.sizeDeltaX, ctrl.sizeDeltaY
+  end)
+  if not ok or type(x) ~= 'number' then return false end
+  return cx >= x - w / 2 - pad and cx <= x + w / 2 + pad
+     and cy >= y - h / 2 - pad and cy <= y + h / 2 + pad
+end
+
+function IN.clearClick() IN.clicked = nil end
+
+return IN
+
+  end)()
+  if __c_input == nil then __c_input = true end
+  return __c_input
+end
+__m_kitchen = function()
+  if __c_kitchen ~= nil then return __c_kitchen end
+  __c_kitchen = (function()
+-- kitchen.lua —— 后厨：名额池 / 小票 / 手法推进 / 交付
+--
+-- 这里装着整局最容易出 bug 的规则，全部是从网页版真实反馈里长出来的：
+--
+--   ① **按单填池**：同一张单的几杯**一起进池**。
+--      规则来自玩家反馈："一个订单多个则同时进入制作池，注意处理好池内最多三个的逻辑。"
+--      反例（网页版踩过的）：第一杯开工就把同单第二杯挤出池 → 玩家以为"第二杯做不了"。
+--   ② **每一杯都出票**，包括还没拿到名额的。
+--      反例：没名额就不出票 → 屏幕上只有一张票，玩家觉得"第二杯根本没进来"。
+--      没名额的票只是"还没挂工位"，名额一腾出来自己就挂上。
+--   ③ **一天只结一次账**：结算要幂等（`settledDay` 闸），否则每帧扣一次房租、欠租滚雪球。
+--   ④ 做完即出（serveNow，例如甜筒）：最后一步收口时**直接交付**，不进打包台。
+
+local CFG = __m_config()
+local R = __m_recipes()
+local S = __m_state()
+local O = __m_order()
+
+local K = {}
+
+-- ── 小票：一杯一张 ──
+local function slipFor(s, cup)
+  for _, sl in ipairs(s.slips) do if sl.cup == cup then return sl end end
+  return nil
+end
+K.slipFor = slipFor
+
+local function makeSlip(s, o, cup)
+  local ex = slipFor(s, cup)
+  if ex then return ex end                     -- ★ 去重：同一杯永远只有一张票
+  s.sid = s.sid + 1
+  local sl = { id = s.sid, cup = cup, o = o, st = nil, ready = false, stalled = 0, auto = false }
+  s.slips[#s.slips + 1] = sl
+  return sl
+end
+K.makeSlip = makeSlip
+
+-- ── 名额池：按进店顺序填池，老单先把自己的杯全塞进去 ──
+--   返回"现在有几个在制"
+--
+-- ★★ 名额口径（两个概念必须分开，网页版这里错过）：
+--     · `cupWip(cup)`  = **已开工**、还没做完 → 直接占一个名额
+--     · `cup.slotReady` = **还没开工、但拿到了开工资格**（在池里等着）→ 也占一个名额
+--   所以 `slotReady` **只对"没开工"的杯有意义**：杯子一旦开工，它的名额由 wipCount 体现，
+--   必须把 slotReady 清掉，否则同一杯被算两次、池子里能塞进超过 CAP 的杯。
+function K.refreshSlots(s)
+  local CAP = CFG.kitchen.maxWip
+  local used = S.wipCount(s)                          -- 已开工占掉的
+  local claimed = 0                                   -- 已发出去、还没开工的资格数
+  for _, o in ipairs(s.orders) do
+    for _, c in ipairs(o.cups) do
+      if c.slotReady and not c.made and c.startedAt == nil then claimed = claimed + 1 end
+    end
+  end
+  local free = math.max(0, CAP - used - claimed)
+
+  local byTime = {}
+  for _, o in ipairs(s.orders) do byTime[#byTime + 1] = o end
+  table.sort(byTime, function(a, b) if a.born == b.born then return a.id < b.id end return a.born < b.born end)
+
+  local qi = 0
+  for _, o in ipairs(s.orders) do
+    o.queueNo = 0; o.priority = false; o.inProgress = false
+    for _, c in ipairs(o.cups) do if S.cupWip(c) then o.inProgress = true end end
+  end
+  for _, o in ipairs(byTime) do
+    if o.status ~= 'done' then
+      local got = 0
+      for _, c in ipairs(o.cups) do
+        if c.made then
+          c.slotReady = false
+        elseif c.startedAt ~= nil then
+          c.slotReady = false                -- ★ 开工=由 wipCount 计名额，清掉资格（别算两次）
+          got = got + 1
+        elseif c.slotReady then
+          got = got + 1                      -- 已在池里的保持资格（不挤同单的杯）
+        elseif free > 0 then
+          c.slotReady = true; free = free - 1; got = got + 1
+        else
+          c.slotReady = false
+        end
+      end
+      if got > 0 then o.priority = true end
+      local anyLeft = false
+      for _, c in ipairs(o.cups) do if not c.made then anyLeft = true end end
+      if anyLeft and not o.inProgress then qi = qi + 1; o.queueNo = qi end
+    end
+  end
+  -- ★★ 不变量硬保证：**在制（已开工）+ 池内（已发资格、未开工）≤ CAP**。
+  --   写法上的教训：不要用"砍 N 个就够"的推理（我连推三次都错）。**每砍一轮就重新数一遍**，
+  --   数到真的不超为止 —— 慢一点点，但不可能算漏。
+  local function snapshot()
+    local w, pool = S.wipCount(s), {}
+    for _, o in ipairs(byTime) do
+      for _, c in ipairs(o.cups) do
+        if c.slotReady and not c.made and c.startedAt == nil then pool[#pool + 1] = c end
+      end
+    end
+    return w, pool
+  end
+  local function enforceCap()
+    for _ = 1, 64 do
+      local w, pool = snapshot()
+      local over = (w + #pool) - CAP
+      if over <= 0 then return end
+      -- 从"最后一单的最后一杯"往前砍（老单优先保留资格）
+      for i = #pool, 1, -1 do
+        if over <= 0 then break end
+        pool[i].slotReady = false
+        over = over - 1
+      end
+    end
+    if _G.__CAPLOG then
+      local w, pool = snapshot()
+      print('[CAP] \229\133\156\229\186\149\228\187\141\230\156\170\230\148\182\230\149\155 used=' .. tostring(w) .. ' pool=' .. tostring(#pool) .. ' CAP=' .. tostring(CAP))
+    end
+  end
+  enforceCap()
+  -- 补票：只要"有资格开工的杯还没票"就补。
+  -- ★ 别用"名额计数变了才补"这种近似判断 —— 我第一版就是那么写的，结果 `used`（已开工数）
+  --   一直是 0，条件永远不成立，**整局一张票都没出**（机器人 0 杯，查了三轮才定位）。
+  --   条件要直接问"有没有该出票的杯"，不做代理判断。
+  if CFG.autoTicket.on then
+    local need = false
+    for _, o in ipairs(s.orders) do
+      if o.status ~= 'done' then
+        for _, c in ipairs(o.cups) do
+          if not c.made and not slipFor(s, c) then need = true end
+        end
+      end
+    end
+    if need then K.makeTicketsFor(s) end
+  end
+  enforceCap()                            -- 补票/挂工位之后可能又有开工，再保一次
+  s._slotsUsed = used
+  return used
+end
+
+-- ── 出票：给**还没起票**的杯补票（含还没拿到名额的）──
+function K.makeTicketsFor(s, order)
+  local list = order and { order } or s.orders
+  local n = 0
+  for _, o in ipairs(list) do
+    if o.status ~= 'done' then
+      local k = 0
+      for _, cup in ipairs(o.cups) do
+        if not cup.made and k < CFG.autoTicket.maxPerOrder and not slipFor(s, cup) then
+          local sl = makeSlip(s, o, cup)
+          local nx = S.nextStep(cup)
+          -- 有资格就顺手挂到第一手；没资格就先放着（"等名额"）
+          if nx then K.routeSlip(s, sl, nx.st) end
+          k = k + 1; n = n + 1
+        end
+      end
+    end
+  end
+  return n
+end
+
+-- ── 把票送到某个工位 ──
+--   这里**只负责"票去哪"**，不负责"开工"。
+--   网页版的教训：「票挂上工位」不等于「玩家开工了」—— 票在队列里排队时不该占名额。
+--   所以 `cup.startedAt` 只在**真正动手**（pressStep / tickHolds 有进展）时才记，
+--   记的时候才调用 refreshSlots 重新分配名额。
+function K.routeSlip(s, sl, stationId)
+  local cup = sl.cup
+  if cup.done then return false, '\232\191\153\230\157\175\229\183\178\231\187\143\228\186\164\228\187\152\228\186\134' end
+  local nx = S.nextStep(cup)
+  if not nx and not sl.ready then return false, '\232\191\153\230\157\175\230\178\161\230\156\137\228\184\139\228\184\128\230\173\165\228\186\134' end
+  -- 没拿到名额的杯**先不许开工**（例外：下一步是"不占名额的纯手感步骤"，那种不占人手）
+  if cup.startedAt == nil and not cup.slotReady and not (nx and nx.noSlot) then
+    return false, string.format('\229\144\142\229\142\168\229\183\178\231\187\143 %d \228\184\170\228\187\187\229\138\161\229\156\168\229\136\182\228\186\134\239\188\140\232\191\153\229\188\160\231\165\168\229\133\136\230\142\146\233\152\159\239\188\136\231\173\137\228\184\128\228\184\170\229\144\141\233\162\157\232\133\190\229\135\186\230\157\165\239\188\137', CFG.kitchen.maxWip)
+  end
+  if sl.ready and stationId ~= 'pack' then return false, '\232\191\153\230\157\175\229\183\178\231\187\143\229\129\154\229\174\140\228\186\134\239\188\140\233\128\129\230\137\147\229\140\133\229\143\176' end
+  local dst = sl.ready and 'pack' or (nx and nx.st)
+  if not dst then return false, '\230\178\161\230\156\137\228\184\139\228\184\128\230\173\165\228\186\134' end
+  if stationId and stationId ~= dst then
+    return false, string.format('\227\128\140%s\227\128\141\232\191\153\228\184\128\230\173\165\232\175\165\229\142\187 %s', nx and nx.t or '\229\135\186\233\164\144', dst)
+  end
+  sl.st = dst
+  sl.stalled = 0
+  return true
+end
+
+-- 真正开工：由"玩家动手"触发（不是挂票触发）
+-- 真正开工：由"玩家动手"触发（不是挂票触发）
+--
+-- ★★ 这里必须**直接问全局在制数**，不能只看这一杯自己的 `slotReady`：
+--   `slotReady` 是"选举结果"（谁优先开工），而名额是**全局共享资源**。
+--   我原来写成 `if not cup.slotReady then return false` —— 结果池里已经站着 3 个杯，
+--   第 4 个杯因为自己 slotReady=true 也被放行开工 → 在制+池内 = 4 > CAP。
+--   （真机自检抓到的：`after beginWork w=0 pool=3`，下一按就变成 w=1 pool=3。）
+--   现在的口径：**能开工 = 全局 wipCount < CAP**（不占名额的纯手感步骤除外）。
+local function beginWork(s, sl)
+  local cup = sl.cup
+  if cup.startedAt ~= nil or cup.made then return false end
+  local nx = S.nextStep(cup)
+  local freeStep = (nx ~= nil and nx.noSlot == true)      -- 不占名额的纯手感步骤
+  if not freeStep and S.wipCount(s) >= CFG.kitchen.maxWip then return false end
+  cup.startedAt = s.t          -- 开工 = 占一个"未完成任务"名额
+  cup.slotReady = false        -- 同时清掉"池内资格"（别算两次）
+  K.refreshSlots(s)            -- 占掉名额后重算：谁还能开工、谁被挤去排队
+  return true
+end
+
+-- ── 按一下（键盘/点击都走这里，保证两条输入路径手感一致）──
+--   返回 { done = 这一步是否收口, step = 该步, before, after }
+function K.pressStep(s, sl)
+  local nx = S.nextStep(sl.cup)
+  if not nx then return { done = false } end
+  beginWork(s, sl)                        -- ★ 真动手才算开工（这里才占名额）
+  local before = nx.done or 0
+  if nx.kind == 'hold' then
+    nx.holdOn = true                     -- 按住：交给 tickHolds 攒时间
+  elseif nx.kind == 'mash' then
+    nx.done = before + 1                 -- 连点：攒次数
+    if nx.done >= (nx.taps or 1) then K.doStep(s, sl) end
+  else
+    nx.done = nx.taps or 1               -- tap：一下就收口
+    K.doStep(s, sl)
+  end
+  return { done = nx.ok == true, step = nx, before = before, after = nx.done or 0 }
+end
+
+-- 按住类每帧推进（松手就停）
+function K.tickHolds(s, dt)
+  for _, sl in ipairs(s.slips) do
+    local nx = S.nextStep(sl.cup)
+    if nx and nx.kind == 'hold' and nx.holdOn then
+      beginWork(s, sl)                    -- ★ 按住也是"动手"：这里才算开工
+      nx.done = math.min(CFG.hold.sec, (nx.done or 0) + dt)
+      if nx.done >= CFG.hold.sec then K.doStep(s, sl) end
+    end
+  end
+end
+
+-- ── 收口：把"当前这一步"标记完成；全部步骤做完 → 这杯 `made` ──
+--   ★★ 三个状态必须分清（我第一版把 done 同时当"做完"和"交付"，导致整局交不掉单）：
+--        steps 全 ok  → 步骤完成
+--        cup.made     → **这杯真的做完了**（可以放托盘 / 直接交付）
+--        cup.done     → **这杯已经交给客人了**（结单计数看这个）
+function K.doStep(s, sl)
+  local cup = sl.cup
+  -- 守卫：这杯已经做完了但票还标着没做完（这种票会永远赖在工位上被反复点）
+  if cup.made and not sl.ready then
+    sl.ready = true
+    return
+  end
+  local nx, idx = S.nextStep(cup)
+  if not nx then return end
+  if (nx.done or 0) < (nx.kind == 'hold' and CFG.hold.sec or (nx.taps or 1)) then return end
+  nx.ok = true
+  local allDone = true
+  for _, st in ipairs(cup.steps) do if not st.ok then allDone = false end end
+  if allDone then
+    cup.made = true
+    cup.finishedAt = s.t
+    if cup.rec.serveNow then
+      -- ★ 做完即出：当场交给客人（甜筒不用打包）
+      O.onCupMade(s, sl.o, cup)
+      K.serveCup(s, cup)
+    else
+      sl.ready = true
+      sl.st = nil
+      O.onCupMade(s, sl.o, cup)
+    end
+  else
+    local nn = S.nextStep(cup)
+    if nn and nn.st ~= sl.st then sl.st = nil end   -- 下一步不在本工位 → 票回到"待流转"
+  end
+end
+
+-- ── 把这杯**交给客人**（放上托盘）──
+--   前置条件：`cup.made`（真的做完了）。交付后 `cup.done = true`，整单全交付才结单。
+function K.deliverCup(s, sl)
+  local o, cup = sl.o, sl.cup
+  if not cup.made then
+    sl.ready = false
+    if sl.st == 'pack' then sl.st = nil end
+    return false, '\232\191\153\230\157\175\232\191\152\230\178\161\229\129\154\229\174\140\239\188\140\228\184\141\232\131\189\228\186\164\231\187\153\229\174\162\228\186\186\239\188\136\231\165\168\229\183\178\233\128\128\229\155\158\239\188\137'
+  end
+  if cup.done then                            -- 已经交过了：清掉这张僵尸票
+    for i = #s.slips, 1, -1 do if s.slips[i] == sl then table.remove(s.slips, i) end end
+    return false, '\232\191\153\230\157\175\229\183\178\231\187\143\228\186\164\232\191\135\228\186\134\239\188\140\230\184\133\230\142\137\232\191\153\229\188\160\231\165\168'
+  end
+  cup.done = true
+  for i = #s.slips, 1, -1 do if s.slips[i] == sl then table.remove(s.slips, i) end end
+  if O.allDelivered(o) then O.finish(s, o, s.t) end   -- 整单都交付了 → 一次结给客人
+  return true
+end
+
+-- ── 做完即出：不走打包台，当场交付 ──
+function K.serveCup(s, cup)
+  for i = #s.slips, 1, -1 do if s.slips[i].cup == cup then table.remove(s.slips, i) end end
+  if not cup.served then
+    cup.served = true
+    cup.done = true
+    s.served = s.served + 1
+    s.today.served = s.today.served + 1
+  end
+  local o
+  for _, x in ipairs(s.orders) do
+    for _, c in ipairs(x.cups) do if c == cup then o = x end end
+  end
+  if o then
+    O.onCupMade(s, o, cup, true)
+    local allDone = true
+    for _, c in ipairs(o.cups) do if not c.done then allDone = false end end
+    if allDone then O.finish(s, o, s.t) end
+  end
+end
+
+-- ── 自愈：清掉"杯子做完了、票还说没做完"的僵尸票（网页版"现萃速溶咖啡像循环"就是这个）──
+function K.sweepZombieSlips(s)
+  local n = 0
+  for i = #s.slips, 1, -1 do
+    local sl = s.slips[i]
+    if sl.cup.made and not sl.ready then
+      sl.ready = true
+      n = n + 1
+    end
+  end
+  return n
+end
+
+-- ── 自动流转：某张票闲够 CFG.auto.after 秒就送去该去的工位 ──
+--   唯一的开关是 CFG.auto.on（关掉之后一次都不许动小票）
+function K.autoForward(s, dt, quiet)
+  local moved = 0
+  if not CFG.auto.on then return moved end
+  for _, sl in ipairs(s.slips) do
+    if sl.cup.made and not sl.ready then sl.ready = true end
+    local nx = S.nextStep(sl.cup)
+    if not nx and not sl.ready then
+      -- 没下一步又没 ready：说明这杯做完了，补上
+      if sl.cup.made then sl.ready = true end
+    else
+      if sl.st == nil then sl.stalled = sl.stalled + dt else sl.stalled = 0 end
+      if sl.stalled > CFG.auto.after then
+        local dst = sl.ready and 'pack' or (nx and nx.st)
+        if dst and sl.st ~= dst then
+          local before = sl.st
+          if K.routeSlip(s, sl, dst) then
+            s.autoMoves = s.autoMoves + 1
+            moved = moved + 1
+          end
+        end
+      end
+    end
+  end
+  -- 已做完没人打包的，也自动送去打包台
+  for _, sl in ipairs(s.slips) do
+    if sl.ready and sl.st ~= 'pack' then
+      if K.routeSlip(s, sl, 'pack') then s.autoMoves = s.autoMoves + 1; moved = moved + 1 end
+    end
+  end
+  return moved
+end
+
+-- ── 手动起杯（关掉自动出票后才有用）：按**这一杯自己的配方**找杯 ──
+--   网页版的 bug：按"订单主料"找，导致混点订单的第二杯点手册没反应
+function K.startCup(s, rec)
+  for _, o in ipairs(s.orders) do
+    if o.status ~= 'done' then
+      for _, c in ipairs(o.cups) do
+        local nx = S.nextStep(c)
+        if not c.made and c.rec.id == rec.id and (c.slotReady or (nx and nx.noSlot)) then
+          if slipFor(s, c) then return true, '\232\191\153\228\184\128\230\157\175\229\183\178\231\187\143\230\156\137\231\165\168\228\186\134' end
+          local sl = makeSlip(s, o, c)
+          local ok = K.routeSlip(s, sl, nx and nx.st)
+          if not ok then
+            for i = #s.slips, 1, -1 do if s.slips[i] == sl then table.remove(s.slips, i) end end
+          end
+          return ok, ok and '\229\176\143\231\165\168\229\183\178\230\140\130\229\136\176\229\183\165\228\189\141' or '\230\140\130\228\184\141\228\184\138'
+        end
+      end
+    end
+  end
+  -- 分清"没人点"和"没名额"
+  for _, o in ipairs(s.orders) do
+    if o.status ~= 'done' then
+      for _, c in ipairs(o.cups) do
+        if not c.made and c.rec.id == rec.id then
+          return false, string.format('\227\128\140%s\227\128\141\232\191\153\228\184\128\230\157\175\232\191\152\230\178\161\230\139\191\229\136\176\229\144\141\233\162\157\239\188\136\229\144\142\229\142\168\229\144\140\230\151\182\229\143\170\232\131\189 %d \228\184\170\228\187\187\229\138\161\229\156\168\229\136\182\239\188\137',
+                                      rec.name, CFG.kitchen.maxWip)
+        end
+      end
+    end
+  end
+  return false, string.format('\231\142\176\229\156\168\230\178\161\228\186\186\231\130\185\227\128\140%s\227\128\141\226\128\148\226\128\148\230\142\165\229\141\149\228\186\134\229\134\141\229\129\154', rec.name)
+end
+
+-- ── 做错工位（翻车）──
+function K.doWrong(s, cup, stationId)
+  cup.err = true
+  s.mistakes = s.mistakes + 1
+  s.today.mistakes = s.today.mistakes + 1
+  s.combo = 0
+  s.money = math.max(0, s.money - CFG.money.strikePenalty)
+  s.score = math.max(0, s.score - CFG.score.mistake)
+  return CFG.money.strikePenalty
+end
+
+return K
+
+  end)()
+  if __c_kitchen == nil then __c_kitchen = true end
+  return __c_kitchen
+end
+__m_order = function()
+  if __c_order ~= nil then return __c_order end
+  __c_order = (function()
+-- order.lua —— 点单（混点生成 + 耐心）
+--
+-- 三条从网页版搬来的硬规则（每条都是玩家反馈换来的）：
+--   ① 一单可以同款多杯，也可以多种不同（"顾客可以点同一种点多杯，也可以点多种不同的"）
+--   ② **不把两个重活放同一单**（干冰 + 另一个重活 = 二十多下连按，那是惩罚不是玩法）
+--   ③ 耐心按**这一单点了几杯**给（杯数越多越愿意等），并且**每做完一杯回补一点**
+--      —— 因为"全做完一起交"会让客人等更久，进度本身就是补偿
+
+local CFG = __m_config()
+local R = __m_recipes()
+local S = __m_state()
+
+local O = {}
+
+-- 抽签用的随机源：**可以注入**（测试要可复现，所以不直接调 math.random）
+--   默认用 math.random；测试里换成确定性序列
+local rng = function() return math.random() end
+function O.setRng(fn) rng = fn end
+
+local function pickWeighted(tbl)
+  return R.pickWeighted(tbl, rng())
+end
+local function pickUniform(list)
+  return list[math.min(#list, math.floor(rng() * #list) + 1)]
+end
+
+-- 生成"这一单要哪几杯什么"：返回 lines = { { rec = 配方, n = 杯数 }, ... }
+--   cupN 总杯数；重活不与重活同单
+function O.drinkPlan(cupN)
+  local pool = R.list
+  if cupN <= 1 then
+    return { { rec = pickUniform(pool), n = cupN } }
+  end
+  -- 混不混：2 杯一半概率，3 杯以上多半会混
+  local mixed = rng() < (cupN == 2 and CFG.mix.mixedChance2 or CFG.mix.mixedChance3)
+  if not mixed then
+    return { { rec = pickUniform(pool), n = cupN } }
+  end
+  local kinds = 2
+  if cupN >= 3 and rng() < 0.5 then kinds = 3 end
+  kinds = math.min(kinds, cupN, #pool)
+
+  local lines, left = {}, cupN
+  for i = 1, kinds do
+    local rest = kinds - i
+    -- 候选：没用过的配方
+    local cand = {}
+    for _, r in ipairs(pool) do
+      local used = false
+      for _, l in ipairs(lines) do if l.rec.id == r.id then used = true end end
+      if not used then cand[#cand + 1] = r end
+    end
+    -- ① 第一项优先选**非重活**（避免"重活 + 重活"）
+    if i == 1 then
+      local light = {}
+      for _, r in ipairs(cand) do if not r.heavy then light[#light + 1] = r end end
+      if #light > 0 then cand = light end
+    end
+    -- ② 后面几项也尽量避开重活（只要还有非重活可选）
+    if i > 1 then
+      local light = {}
+      for _, r in ipairs(cand) do if not r.heavy then light[#light + 1] = r end end
+      if #light > 0 then cand = light end
+    end
+    if #cand == 0 then cand = pool end
+    local rec = pickUniform(cand)
+    -- 给后面几项至少各留 1 杯
+    local maxN = left - rest
+    local n
+    if i == kinds then n = left
+    else n = math.max(1, math.min(maxN, 1 + math.floor(rng() * math.max(1, maxN)))) end
+    lines[#lines + 1] = { rec = rec, n = n }
+    left = left - n
+  end
+  -- 兜底：万一算法把杯数算漏了，全补到最后一项（宁可名字难看，也不能少杯）
+  local sum = 0
+  for _, l in ipairs(lines) do sum = sum + l.n end
+  if sum < cupN then lines[#lines].n = lines[#lines].n + (cupN - sum) end
+  return lines
+end
+
+-- 生成一张订单
+function O.spawn(s)
+  local cupN = pickWeighted(CFG.cups).n
+  local lines = O.drinkPlan(cupN)
+  local ice = pickWeighted(CFG.ice).v
+  local sugar = pickWeighted(CFG.sugar).v
+  local P = CFG.patience
+  -- 耐心：按杯数给 + 个体差异
+  local pat = math.max(P.min, P.base + cupN * P.perCup) * (1 + (rng() * 2 - 1) * P.jitter)
+  s.oid = s.oid + 1
+  local o = {
+    id = s.oid, name = O.pickName(), rec = lines[1].rec, lines = lines,
+    ice = ice, sugar = sugar,
+    cups = {}, need = cupN, pat = pat, patMax = pat,
+    made = 0, delivered = 0, status = 'wait',
+    inProgress = false, priority = false, queueNo = 0,
+    patBonus = 0, born = s.t,
+  }
+  local i = 0
+  for _, line in ipairs(lines) do
+    for _ = 1, line.n do
+      i = i + 1
+      local steps = {}
+      for _, st in ipairs(line.rec.steps) do
+        steps[#steps + 1] = { st = st.st, t = st.t, kind = st.kind, taps = st.taps,
+                              noSlot = st.noSlot, ok = false, done = 0 }
+      end
+      o.cups[#o.cups + 1] = { made = false,
+        i = i, rec = line.rec, steps = steps, done = false, served = false,
+        err = false, startedAt = nil, finishedAt = nil, slotReady = false,
+      }
+    end
+  end
+  local names = {}
+  for _, line in ipairs(lines) do names[#names + 1] = line.n .. '\195\151' .. line.rec.name end
+  o.makeup = table.concat(names, ' + ')
+  s.orders[#s.orders + 1] = o
+  return o
+end
+
+O.NAMES = { '\233\154\148\229\163\129\232\128\129\231\142\139', '\233\155\170\231\154\135\230\156\172\229\176\138', '\230\159\160\230\170\172\231\178\190', '\229\185\178\229\134\176\231\136\177\229\165\189\232\128\133', '\228\184\141\229\150\157\229\134\176\231\154\132\233\152\191\229\167\168', '\231\137\169\231\144\134\231\179\187\229\173\166\229\188\159',
+            '\231\137\155\233\161\191\230\156\172\228\186\186', '\229\144\142\229\142\168\229\174\158\228\185\160\231\148\159', '\230\140\145\229\137\148\231\154\132\231\190\142\233\163\159\229\174\182', '\229\138\160\231\143\173\229\136\176\229\135\140\230\153\168\231\154\132\228\186\186', '\228\184\128\230\157\175\229\176\177\229\128\146', '\229\155\155\230\157\175\230\137\147\229\140\133' }
+function O.pickName() return pickUniform(O.NAMES) end
+
+-- 做完一杯：记账 + **给客人续一点耐心**（续的量与这杯的工序量挂钩）
+--
+-- ★★ 杯子有三个状态，别混（我第一版把 done 既当"做完"又当"放上托盘"，结果整局交不掉单）：
+--     cup.steps 全 ok  = 这一步做完了
+--     cup.made   = true = **这杯真的做完了**（可以放托盘 / 直接交付）
+--     cup.done   = true = **这杯已经交给客人了**（结单计数用这个）
+--   `o.made` 统计的是 "做完" 的杯数；`O.finish` 只在**全部交付**时调用。
+function O.onCupMade(s, o, cup, served)
+  o.made = 0
+  for _, c in ipairs(o.cups) do if c.made then o.made = o.made + 1 end end
+  if not served and o.status ~= 'done' then
+    o.status = (o.made < o.need) and 'ready' or 'done'
+  end
+  local P = CFG.patience
+  local load = 0
+  for _, st in ipairs(cup.steps) do
+    load = load + ((st.kind == 'mash') and (st.taps or 1) or 1)
+  end
+  local bonus = P.doneBonus + math.min(P.doneBonusMax, load * P.perStep)
+  o.pat = math.min(o.patMax, o.pat + bonus)
+  o.patBonus = o.patBonus + bonus
+  return bonus
+end
+
+-- 整单交付的判定：**每一杯都交付了**才算整单完成（不是"做完了"）
+function O.allDelivered(o)
+  for _, c in ipairs(o.cups) do if not c.done then return false end end
+  return true
+end
+
+-- 客人走了（耐心清零）：记流失并把它移除
+function O.leave(s, o, wasWaiting)
+  o.status = 'lost'
+  s.left = s.left + 1
+  s.today.left = s.today.left + 1
+  if wasWaiting then s.leftWaiting = s.leftWaiting + 1 end
+  s.combo = 0
+  s.money = math.max(0, s.money - CFG.money.leavePenalty)
+  s.score = math.max(0, s.score - CFG.score.leave)
+  for i = #s.orders, 1, -1 do if s.orders[i] == o then table.remove(s.orders, i) end end
+  -- 它的票也一起撤掉（否则会留下"没有主人的票"）
+  for i = #s.slips, 1, -1 do if s.slips[i].o == o then table.remove(s.slips, i) end end
+  return o
+end
+
+-- 整单交付结算：一次连击、一次评分
+function O.finish(s, o, now)
+  o.delivered = o.need
+  o.status = 'done'
+  local perfect = true
+  local slowest = 0
+  for _, c in ipairs(o.cups) do
+    if c.err then perfect = false end
+    local used = (c.finishedAt or now) - (c.startedAt or 0)
+    if used > slowest then slowest = used end
+  end
+  local fast = slowest < 25
+  if perfect then s.combo = s.combo + 1; s.maxCombo = math.max(s.maxCombo, s.combo)
+  else s.combo = 0 end
+  local tip = math.min(CFG.money.comboMax, s.combo * CFG.money.comboStep)
+  local earn, sc = 0, 0
+  for _, c in ipairs(o.cups) do
+    earn = earn + CFG.money.perCup + math.floor(c.rec.price * 0.2)
+      + (perfect and 4 or 0) + (fast and CFG.money.rushBonus or 0) + tip
+    sc = sc + CFG.score.perCup + (perfect and 20 or 0)
+      + (fast and CFG.score.rushBonus or 0) + s.combo * 2
+  end
+  if not perfect then earn = math.floor(earn * 0.5); sc = math.floor(sc * 0.7) end
+  s.money = s.money + earn
+  s.score = s.score + sc
+  s.today.money = s.today.money + earn
+  -- 已"做完即出"的杯已经单独记过 served，不重复计
+  local already = 0
+  for _, c in ipairs(o.cups) do if c.served then already = already + 1 end end
+  local addCups = o.need - already
+  s.served = s.served + addCups
+  s.today.served = s.today.served + addCups
+  for i = #s.orders, 1, -1 do if s.orders[i] == o then table.remove(s.orders, i) end end
+  return { earn = earn, score = sc, perfect = perfect, fast = fast, tip = tip, cups = addCups }
+end
+
+return O
+
+  end)()
+  if __c_order == nil then __c_order = true end
+  return __c_order
+end
+__m_recipes = function()
+  if __c_recipes ~= nil then return __c_recipes end
+  __c_recipes = (function()
+-- recipes.lua —— 产品表（配方 + 手法 + 出餐方式）
+--
+-- 每一步写三件事：
+--   st   工位（shake 捣 / fire 火 / chem 化 / brew 泡 / pack 打包）
+--   t    这一步的文案（会显示在按钮和手册上，写清"做什么"，别写"点这里"）
+--   kind 手法：tap 一下 ／ mash 连按 N 下 ／ hold 按住
+-- 缺省 kind 由 taps 推断：
+--   有 taps（且 >1）→ mash；否则 tap。
+-- ★ 手法要**混着来**：全是连按会很累，全是一下又没手感。
+--
+-- 特殊标记：
+--   serveNow = 做完即出（不进打包台，最后一步收口时直接交给客人）
+--   noSlot   = 这一步**不占后厨名额**（纯手感步骤，例如速溶咖啡的拆包）
+--             意义：一杯 3 步的咖啡不该和一杯十几下连按的干冰抢同一个名额
+--   heavy    = 重活（混点时不把两个重活放同一单）
+
+local recipes = {}
+
+-- ── 工位 id（逻辑层只认这四个 + pack）──
+recipes.STATIONS = { 'shake', 'fire', 'chem', 'brew', 'pack' }
+
+local list = {
+  {
+    id = 'dryice', name = '\229\185\178\229\134\176\229\185\178\230\159\160\230\170\172\230\176\180', tag = '\229\134\176', price = 30, diff = 2, source = '\229\174\152\230\150\185',
+    heavy = true,   -- 重活：十几下连按
+    steps = {
+      { st = 'brew',  t = '\230\148\190\229\133\165\229\185\178\230\159\160\230\170\172\231\137\135', kind = 'tap' },
+      { st = 'brew',  t = '\229\138\160\230\176\180\232\135\179\228\184\131\229\136\134\230\187\161', kind = 'tap' },
+      { st = 'shake', t = '\229\143\140\230\137\139\230\143\161\228\189\143\230\157\175\229\173\144', kind = 'hold' },
+      { st = 'shake', t = '\229\191\171\233\128\159\229\142\139\231\188\169\229\134\133\233\131\168\231\169\186\230\176\148\232\135\179 25000 \229\141\131\229\184\149', kind = 'mash', taps = 6 },
+      { st = 'shake', t = '\231\187\167\231\187\173\229\142\139\231\188\169\239\188\140\231\155\180\232\135\179\229\135\186\231\142\176\229\155\186\230\128\129\229\185\178\229\134\176', kind = 'mash', taps = 6 },
+      { st = 'pack',  t = '\229\176\129\230\157\175\229\135\186\233\164\144', kind = 'tap' },
+    },
+  },
+  {
+    -- ★ 恶搞产品：neta 现实里的「黑芝麻冰麒麟」（黑→白、冰→火、雪糕→辣甜筒）
+    --   定位：快消品 —— 工序只有"掏枪筒 + 喷火"两件事，喷完直接递给客人，不进打包台
+    --   它本质是**一支甜筒**，不是杯装饮料，所以没有封杯这回事
+    id = 'qilin', name = '\231\153\189\232\138\157\233\186\187\231\129\171\233\186\146\233\186\159', tag = '\231\148\156', price = 32, diff = 1, source = '\229\174\152\230\150\185',
+    serveNow = true,
+    steps = {
+      { st = 'fire', t = '\228\187\142"\230\158\170\231\173\146"\233\135\140\230\142\143\229\135\186\231\148\156\231\173\146\239\188\136\230\158\170\231\173\146\230\152\175\228\184\128\231\167\141\230\129\182\230\144\158\231\154\132\231\148\156\231\173\146\239\188\137', kind = 'tap' },
+      { st = 'fire', t = '\231\148\168\229\150\183\231\129\171\230\158\170\231\131\164\233\166\153\239\188\140\231\131\164\229\174\140\231\155\180\230\142\165\233\128\146\231\187\153\229\174\162\228\186\186\239\188\136\231\148\156\231\173\146\228\184\141\231\148\168\230\137\147\229\140\133\239\188\137', kind = 'hold' },
+    },
+  },
+  {
+    id = 'bromine', name = '\231\169\186\230\157\175\230\187\161\230\157\175\229\141\131\230\186\180\230\176\180', tag = '\230\186\180', price = 44, diff = 3, source = '\229\174\152\230\150\185',
+    steps = {
+      { st = 'chem',  t = '\231\148\168\233\135\143\231\173\146\229\143\150 10ml \230\186\180\230\176\180\229\142\159\230\182\178', kind = 'hold' },
+      { st = 'chem',  t = '\229\138\160\230\187\161\231\169\186\230\157\175\232\135\179\230\187\161\230\157\175', kind = 'mash', taps = 5 },
+      { st = 'shake', t = '\230\145\135\229\140\128\232\135\179\233\162\156\232\137\178\229\157\135\228\184\128', kind = 'mash', taps = 4 },
+      { st = 'pack',  t = '\229\176\129\230\157\175\229\135\186\233\164\144', kind = 'tap' },
+    },
+  },
+  {
+    id = 'instcoffee', name = '\231\142\176\232\144\131\233\128\159\230\186\182\229\146\150\229\149\161', tag = '\229\146\150', price = 24, diff = 1, source = '\229\174\152\230\150\185',
+    -- ★ 全 tap：这是"新手第一杯"，刻意不做连按/按住；前三步拆包也不占名额
+    steps = {
+      { st = 'brew', t = '\229\143\150\233\128\159\230\186\182\229\146\150\229\149\161\231\178\137', kind = 'tap', noSlot = true },
+      { st = 'brew', t = '\230\148\190\229\133\165\229\146\150\229\149\161\230\156\186\231\178\137\231\162\151', kind = 'tap', noSlot = true },
+      { st = 'brew', t = '\230\140\137\228\184\139\232\144\131\229\143\150\233\148\174', kind = 'tap', noSlot = true },
+      { st = 'brew', t = '\230\179\168\229\133\165\231\131\173\230\176\180', kind = 'tap' },
+      { st = 'pack', t = '\229\176\129\230\157\175\229\135\186\233\164\144', kind = 'tap' },
+    },
+  },
+  {
+    id = 'newton', name = '\231\137\155\233\161\191\232\139\185\230\158\156\229\165\182\231\187\191', tag = '\232\139\185', price = 34, diff = 2, source = '\229\174\152\230\150\185',
+    steps = {
+      { st = 'shake', t = '\230\138\138\232\139\185\230\158\156\231\160\184\232\191\155\230\157\175\229\173\144\233\135\140\239\188\136\233\135\141\229\138\155\229\138\160\233\128\159\229\186\166\232\175\183\232\135\170\232\161\140\232\132\145\232\161\165\239\188\137', kind = 'mash', taps = 4 },
+      { st = 'brew',  t = '\230\179\168\229\133\165\231\187\191\232\140\182\230\177\164', kind = 'tap' },
+      { st = 'chem',  t = '\229\138\160\229\133\165\229\165\182\231\178\190', kind = 'tap' },
+      { st = 'brew',  t = '\230\179\168\229\133\165\231\137\155\229\165\182', kind = 'hold' },
+      { st = 'pack',  t = '\229\176\129\230\157\175\229\135\186\233\164\144', kind = 'tap' },
+    },
+  },
+  {
+    id = 'peach', name = '\232\159\160\230\161\131\229\155\155\229\173\163\230\152\165', tag = '\230\161\131', price = 36, diff = 2, source = '\229\174\152\230\150\185',
+    steps = {
+      { st = 'brew',  t = '\230\179\168\229\133\165\229\155\155\229\173\163\230\152\165\232\140\182\230\177\164', kind = 'hold' },
+      { st = 'fire',  t = '\231\130\153\231\131\164\230\157\175\229\143\163\239\188\136\231\131\164\229\135\186\231\132\166\231\179\150\233\166\153\239\188\137', kind = 'hold' },
+      { st = 'shake', t = '\229\138\160\229\133\165\232\159\160\230\161\131\230\158\156\232\130\137\229\185\182\230\145\135\229\140\128', kind = 'mash', taps = 5 },
+      { st = 'pack',  t = '\229\176\129\230\157\175\229\135\186\233\164\144', kind = 'tap' },
+    },
+  },
+}
+
+-- ── 规范化：给每一步补上 kind / taps / noSlot，并算出这杯的"工序量" ──
+--   工序量 = 每步的成本之和（连按按次数算），用于：耐心回补量、评分里"重活"的判定
+local TAPS = __m_config().taps
+for _, r in ipairs(list) do
+  local load = 0
+  for i, s in ipairs(r.steps) do
+    if not s.kind then s.kind = (s.taps and s.taps > 1) and 'mash' or 'tap' end
+    if s.kind == 'mash' and not s.taps then
+      -- 没写 taps 的连按：按配方难度取档（4/5/6 下）
+      s.taps = TAPS[math.min(#TAPS, math.max(1, r.diff))]
+    end
+    if s.kind ~= 'mash' then s.taps = nil end
+    s.noSlot = s.noSlot == true
+    load = load + (s.kind == 'mash' and (s.taps or 1) or 1)
+  end
+  r.load = load
+  -- 出餐方式：serveNow 的品最后一步自己就是交付点
+  r.needsPack = not r.serveNow and r.steps[#r.steps].st == 'pack'
+end
+
+recipes.list = list
+
+-- 按 id 取配方
+function recipes.byId(id)
+  for _, r in ipairs(list) do if r.id == id then return r end end
+  return nil
+end
+
+-- 线性插值取加权随机项（加权查表：比概率累加快、也比它好读）
+--   util 传 [0,1) 的随机数进来，方便测试复现
+function recipes.pickWeighted(tbl, util)
+  local total = 0
+  for _, e in ipairs(tbl) do total = total + (e.p or 0) end
+  local x = (util or 0) * total
+  local acc = 0
+  for _, e in ipairs(tbl) do
+    acc = acc + (e.p or 0)
+    if x < acc then return e end
+  end
+  return tbl[#tbl]
+end
+
+return recipes
+
+  end)()
+  if __c_recipes == nil then __c_recipes = true end
+  return __c_recipes
+end
+__m_state = function()
+  if __c_state ~= nil then return __c_state end
+  __c_state = (function()
+-- state.lua —— 运行时状态（唯一的一份，谁都不许另开变量存游戏数据）
+--
+-- 为什么要单独一个模块：网页版吃过亏 —— "谁在制、谁排队"这类状态散在几个函数里各存一份，
+-- 改了 A 忘了 B，表现就是"莫名其妙的重复小票/名额不释放"。
+-- 千星版从第一天起：**所有游戏状态都挂在这一个表上**。
+
+local CFG = __m_config()
+
+local S = {}
+
+-- 一局的状态。newGame 时创建，之后所有模块都读写它。
+function S.new(modeName)
+  local m = CFG.mode(modeName)
+  return {
+    mode = m,
+    -- 时间
+    t = 0,                 -- 真实经过（秒）
+    day = 1,
+    dayLeft = m.perDay,
+    totalLeft = m.total,
+    flow = 1,
+    idle = 0,
+    phase = 'open',        -- open 营业中 | closing 打烊清场（耐心冻结）| done 收工
+    lastCallDay = 0,       -- "最后接单"提示只在当天弹一次
+    closingLeft = 0,
+    settling = false,      -- 正在出当日结算页（防止每帧重复结算）
+    settledDay = 0,        -- 已结算过哪一天（幂等闸）
+    -- 内容
+    orders = {},           -- 订单数组
+    slips = {},            -- 小票数组（一杯一张）
+    oid = 0,               -- 订单自增 id
+    sid = 0,               -- 小票自增 id
+    nextArrive = CFG.arrive.first,
+    -- 账
+    money = 0, rentPaid = 0, rentDebt = 0,
+    served = 0, mistakes = 0, left = 0, leftWaiting = 0,
+    score = 0, combo = 0, maxCombo = 0,
+    today = { served = 0, money = 0, left = 0, mistakes = 0 },
+    dayStats = {},
+    log = {},
+    ended = false,
+    autoMoves = 0,
+  }
+end
+
+-- 今天还剩多少比例（打烊减速用）
+function S.dayFrac(s)
+  if s.mode.perDay <= 0 then return 1 end
+  return math.max(0, math.min(1, s.dayLeft / s.mode.perDay))
+end
+
+-- 当前这一杯的"下一步"（每一步 ok=true 之后自动往后走；全做完返回 nil）
+function S.nextStep(cup)
+  for i = 1, #cup.steps do
+    if not cup.steps[i].ok then return cup.steps[i], i end
+  end
+  return nil
+end
+
+-- 这一杯算不算"占着后厨名额"
+--   开了工 + 已经摸到"占名额"的那一步（中间的纯手感步骤还没占；速溶咖啡前三步就是这种）
+function S.cupWip(cup)
+  if cup.made or cup.startedAt == nil then return false end
+  local _, idx = S.nextStep(cup)
+  local upto = idx or #cup.steps
+  for k = 1, upto do
+    if not cup.steps[k].noSlot then return true end
+  end
+  return false
+end
+
+-- 现在有几个"未完成任务"在制
+function S.wipCount(s)
+  local n = 0
+  for _, o in ipairs(s.orders) do
+    for _, c in ipairs(o.cups) do if S.cupWip(c) then n = n + 1 end end
+  end
+  return n
+end
+
+return S
+
+  end)()
+  if __c_state == nil then __c_state = true end
+  return __c_state
+end
+__m_view = function()
+  if __c_view ~= nil then return __c_view end
+  __c_view = (function()
+-- view.lua —— 表现层：把逻辑层的状态画成控件
+--
+-- ★ 设计风格（第二版：用户反馈"色块铺满"显得土，重写）：
+--   **深底 + 小面积亮色**，而不是整块涂满颜色。这是原神式 UI 的核心做法：
+--     ① 面板/工位底板用**近黑的深色**（互相之间只差一点亮度，分出层次）
+--     ② 颜色只出现在**细窄的地方**：工位左侧色条、标题文字、进度条
+--     ③ 状态靠"色条 + 文字"变化，不靠整块变色 —— 整块变色又土又刺眼
+--   配合 host.lua 的 H.spawnBox（底 + 边条）：平台没有描边字段，边框只能自己画。
+--
+-- 平台约束（都是踩过的坑，别改回去）：
+--   · **控件池**：运行期只改属性，绝不新建/销毁
+--   · 新建控件的默认值是"**纯白 + 可见**"→ 建完必须**立刻**设色或隐藏
+--   · 坐标原点是**父控件中心**；单位是屏幕像素（设计单位 × scale，混用会把面板推出屏幕）
+--   · 文字要放进方块**内部**（放上方会飘在深色背景上，看起来像"方块是空的"）
+--   · 文字用中文/ASCII，别用 emoji（原神没 emoji 字体 → 豆腐块；tools/font-audit.mjs 会拦）
+--
+-- 版式（设计坐标，原点在画布中心，y 向上）：
+--     ┌──────────────────────────────────┬─────────────┐
+--     │ 标题 · 时钟 · 数据行               │  订单面板    │
+--     │ ┌────────┐ ┌────────┐            │ ┌─────────┐ │
+--     │ │捣锤区   │ │火系区   │            │ │ 顾客卡   │ │
+--     │ └────────┘ └────────┘            │ └─────────┘ │
+--     │ ┌────────┐ ┌────────┐            │             │
+--     │ │化学区   │ │萃茶区   │            │             │
+--     │ └────────┘ └────────┘            │             │
+--     │ ═══════ 打包台 ═══════            │             │
+--     └──────────────────────────────────┴─────────────┘
+
+local H = __m_host()
+local STATE = __m_state()
+local CFG = __m_config()
+
+local V = {}
+
+-- 工位定义（id 要和 recipes.lua / kitchen.lua 里的字符串一致）
+--   ★ accent 是"这个工位的招牌色"，只用在小地方（左色条 / 标题 / 进度条）
+V.STATIONS = {
+  { id = 'shake', name = '\230\141\163\233\148\164\229\140\186', key = 'B', accent = { 78, 150, 255 } },   -- 蓝
+  { id = 'fire',  name = '\231\129\171\231\179\187\229\140\186', key = 'H', accent = { 255, 138, 58 } },   -- 橙
+  { id = 'chem',  name = '\229\140\150\229\173\166\229\140\186', key = 'C', accent = { 176, 124, 255 } },  -- 紫
+  { id = 'brew',  name = '\232\144\131\232\140\182\229\140\186', key = 'P', accent = { 62, 206, 150 } },   -- 青绿
+}
+V.PACK = { id = 'pack', name = '\230\137\147\229\140\133\229\143\176', key = '\231\169\186\230\160\188', accent = { 56, 214, 200 } }
+V.STATION_NAME = { shake = '\230\141\163\233\148\164\229\140\186', fire = '\231\129\171\231\179\187\229\140\186', chem = '\229\140\150\229\173\166\229\140\186', brew = '\232\144\131\232\140\182\229\140\186', pack = '\230\137\147\229\140\133\229\143\176' }
+
+-- ── 配色：底全是近黑深色，颜色留给小面积元素 ──
+local C = {
+  panelBg  = { 26, 30, 44, 240 },
+  cardBg   = { 36, 42, 60, 245 },
+  cardHot  = { 46, 54, 78, 250 },
+  cardDone = { 34, 52, 54, 245 },
+  stripBg  = { 18, 21, 32, 245 },
+  text     = { 238, 243, 252, 255 },
+  dim      = { 176, 190, 218, 255 },
+  faint    = { 128, 142, 170, 255 },
+  gold     = { 255, 214, 130, 255 },
+  good     = { 122, 232, 160, 255 },
+  bad      = { 255, 122, 132, 255 },
+  warn     = { 255, 196, 96, 255 },
+  stepOk   = { 255, 255, 255, 255 },
+  stepTodo = { 62, 70, 92, 255 },
+}
+
+local MAX_ORDERS = 5
+
+-- 订单行布局参数（建池与同步共用，避免重复魔数）
+local CARD_H, CARD_W, CARD_PW = 104, 330, 14
+local BAR_W = CARD_W - CARD_PW - 24
+
+local txtCache, colCache = {}, {}
+local function setText(c, s)
+  if not c then return end
+  s = tostring(s)
+  if txtCache[c] == s then return end
+  txtCache[c] = s
+  pcall(function() c.text = s end)
+end
+local function setFont(c, size, col)
+  if not c then return end
+  local key = tostring(size) .. '|' .. (col and (col[1] * 65536 + col[2] * 256 + col[3]) or 'd')
+  if colCache[c] == key then return end
+  colCache[c] = key
+  pcall(function()
+    if size then c.fontSize = size end
+    if col then c.fontColor = Color.FromRGB(col[1], col[2], col[3]) end
+  end)
+end
+
+local function recName(o)
+  if o.makeup and o.makeup ~= '' then return o.makeup end
+  local r = o.lines and o.lines[1] and o.lines[1].rec
+  return r and r.name or '?'
+end
+
+-- ── 把控件提到同级最上层（Z 序）──
+--   ★ 这层的铁律是"**后建的控件盖在先建的上面**"，而 HUD 很早就建了 →
+--     后面的工位/订单面板全都会盖住 HUD（表现："HUD 文字看不见"，但控件其实存在且在屏幕内）。
+--   所以 HUD 全部建完后要显式提到最上层。
+function H.raiseTop(c)
+  if not c then return false end
+  local ok = pcall(function() c:SetAsLastSibling() end)
+  if not ok then pcall(function() c:SetSiblingIndex(999) end) end
+  return ok
+end
+
+-- ── 玩区显隐 ──
+--   ★ 只在"场景切换"时调一次（进菜单/开局），**不要每帧对比状态**。
+--   我第一版写成"每帧检查+自愈"，结果和别处的显隐逻辑互相打架，
+--   表现为"方块一会儿有一会儿没有"，查了很久。教训：显隐要有**单一触发点**。
+function V.setBoardVisible(v, on)
+  if not v or not v.stations then return 0 end
+  local n = 0
+  local function toggle(ctl)
+    if not ctl then return end
+    -- ★ 不用 H.show/Hide，直接调 API，并把**调用是否抛错**记下来
+    --   （曾经出现"调用成功但状态不变"的情况，所以要连"调用结果+回读"一起看）
+    pcall(function() ctl:SetActive(on and true or false) end)
+    pcall(function() ctl:SetVisible(on and true or false) end)
+    n = n + 1
+  end
+  for _, st in ipairs(V.STATIONS) do
+    local slot = v.stations[st.id]
+    if slot then
+      toggle(slot.box); toggle(slot.edge); toggle(slot.title); toggle(slot.body)
+    end
+  end
+  toggle(v.pack.box); toggle(v.pack.edge); toggle(v.pack.label)
+  return n
+end
+
+-- ── 初始化：建池 ──
+function V.init(hostCfg)
+  local v = { cfg = hostCfg, stations = {}, orders = {} }
+  local W, H0 = hostCfg.spaceW or hostCfg.canvasW, hostCfg.spaceH or hostCfg.canvasH
+  v.scale = H0 / 720
+  v.baseW = math.min(W / v.scale, 1280)   -- 横向基准上限 = 16:9（设计画布 1600x900）
+  v.W, v.H = W, H0
+  v.xGrow = v.baseW / 1280
+  -- ★ 偏移默认 **0**：我一度按"截图看起来偏右"填了 -380，结果量出来方块全跑到屏幕外
+  --   （用户截图里蓝块中心 = 屏幕 565 像素，和我算的 565 完全吻合 → 本来就没偏）。
+  --   需要微调时再改 tuneX（设计单位，会乘 scale）。
+  v.tuneX = (tonumber(tostring(H.param('tuneX', 0))) or 0) * v.scale
+  v.tuneY = (tonumber(tostring(H.param('tuneY', 0))) or 0) * v.scale
+
+  -- 工位 2x2（底板 + 左色条 + 标题 + 状态 + 步骤点）
+  for i, st in ipairs(V.STATIONS) do
+    local col, row = (i - 1) % 2, math.floor((i - 1) / 2)
+    local x = (col == 0) and -300 or 10
+    local y = (row == 0) and 70 or -60
+    local w, h = 290, 112
+    -- ★ 工位**整块上色**（用户明确要"彩色色块"）：
+    --   我上一版做成"深底 + 左彩条"，看着偏暗、被用户当成"彩色没恢复"。
+    local box, edge = H.spawnBox(hostCfg, 'St_' .. st.id, x, y, w, h, st.accent, nil, nil, 0)
+    local title = H.spawn(hostCfg, 'text', 'StT_' .. st.id)
+    local body  = H.spawn(hostCfg, 'text', 'StB_' .. st.id)
+    H.setPos(title, x + CARD_PW / 2 + 8, y + 30); H.setSize(title, w - CARD_PW - 24, 26)
+    setFont(title, 21, C.text)          -- 彩底上用白字
+    -- ★ 进度条**已删除**（用户："进度条也不想要"）。
+    --   进度信息只靠方块里的文字表达（"连按 3/5"、"按住"、"第 N 步"）。
+    H.setPos(body, x + CARD_PW / 2 + 8, y - 14); H.setSize(body, w - CARD_PW - 24, 56)
+    setFont(body, 15, { 240, 246, 255 })   -- 彩底上的正文也提亮
+    setText(title, st.name .. '  ' .. st.key)
+    setText(body, '\231\173\137\229\190\133\229\176\143\231\165\168')
+    -- ★ 步骤点（每工位 6 个 14x8 小方块）**已删除**：
+    --   用户反馈"有几个很小的装饰性方块没删干净"——就是这 24 个。
+    --   它们是我加的"这一步做完没有"的指示，但和方块里的文字重复，而且看着像残留。
+    v.stations[st.id] = { box = box, edge = edge, title = title, body = body,
+                          x = x, y = y, w = w, h = h, accent = st.accent }
+  end
+
+  -- 打包台（扁长卡片 + 顶部色条）
+  do
+    local x, y, w, h = -330, -212, 660, 76
+    -- ★ 打包台和 4 个工位一样**整块上色**（用户：整体彩色也挺好看，别改成深底）。
+    --   上一版做成了"深底 + 顶部细条"→ 深底占大半，看着发闷。
+    local box, edge = H.spawnBox(hostCfg, 'St_pack', x, y, w, h, V.PACK.accent, nil, nil, 0)
+    local label = H.spawn(hostCfg, 'text', 'StLab_pack')
+    H.setPos(label, x, y); H.setSize(label, w - 30, 54)
+    setFont(label, 22, C.text)   -- 亮底上用白字（原来用青绿字，在青绿底上会糊）
+    setText(label, V.PACK.name .. '  ' .. V.PACK.key)
+    v.pack = { box = box, edge = edge, label = label, x = x, y = y, w = w, h = h }
+  end
+
+  -- HUD
+  -- 订单面板
+  do
+    local pw, ph = CARD_W + 24, 700
+    local px = ((v.baseW / 2) - (10 / v.scale) - (pw / 2)) * v.scale
+    local py = -8
+    local panel = H.spawn(hostCfg, 'img', 'OrderPanel')
+    H.setPos(panel, px, py); H.setSize(panel, pw, ph)
+    H.setColor(panel, C.panelBg[1], C.panelBg[2], C.panelBg[3], C.panelBg[4])
+    local head = H.spawn(hostCfg, 'text', 'OrderHead')
+    H.setPos(head, px, py + ph / 2 - 30); H.setSize(head, pw - 30, 26)
+    setFont(head, 18, C.gold)
+    setText(head, '\231\173\137\229\128\153\229\140\186')
+    v.panel = { box = panel, head = head, x = px, y = py, w = pw, h = ph }
+  end
+
+  -- 订单行
+  for i = 1, MAX_ORDERS do
+    local y = 236 - (i - 1) * (CARD_H + 8)
+    local box, edge = H.spawnBox(hostCfg, 'Od_' .. i, v.panel.x, y, CARD_W, CARD_H, C.cardBg, 'left', C.stepTodo, CARD_PW)
+    local who  = H.spawn(hostCfg, 'text', 'OdW_' .. i)
+    local what = H.spawn(hostCfg, 'text', 'OdT_' .. i)
+    local pbar = H.spawn(hostCfg, 'img', 'OdB_' .. i)
+    local pfil = H.spawn(hostCfg, 'img', 'OdF_' .. i)
+    local tx = v.panel.x + CARD_PW / 2 + 6
+    H.setPos(who, tx, y + 32);  H.setSize(who, CARD_W - CARD_PW - 26, 28)
+    setFont(who, 19, C.text)
+    H.setPos(what, tx, y + 4);  H.setSize(what, CARD_W - CARD_PW - 26, 24)
+    setFont(what, 14, C.faint)
+    H.setPos(pbar, tx, y - 34); H.setSize(pbar, BAR_W, 10)
+    H.setColor(pbar, C.stripBg[1], C.stripBg[2], C.stripBg[3], 255)
+    H.setPos(pfil, tx - BAR_W / 2, y - 34); H.setSize(pfil, BAR_W, 10)
+    H.setColor(pfil, C.good[1], C.good[2], C.good[3], 255)
+    H.hideBox(box, edge, who, what, pbar, pfil)   -- ★ 建完立刻藏（新控件默认纯白+可见）
+    v.orders[i] = { box = box, edge = edge, who = who, what = what, pbar = pbar, pfil = pfil,
+                    x = v.panel.x, y = y }
+  end
+
+  -- 横向铺满 + 手动微调（无条件跑）
+  do
+    local function grow(c, depth)
+      if not c or depth > 3 then return end
+      local x, y = nil, nil
+      local ok = pcall(function() x, y = c.anchoredPositionX, c.anchoredPositionY end)
+      if ok and type(x) == 'number' and type(y) == 'number' then
+        local isPanel = (c.name == 'OrderPanel' or c.name == 'OrderHead')
+        local nx = isPanel and x or (x * v.xGrow)
+        pcall(function() c:SetAnchoredPosition(nx + v.tuneX, y + v.tuneY) end)
+      end
+      local ok2, kids = pcall(function() return c:GetChildren() end)
+      if ok2 and type(kids) == 'table' then for i = 1, #kids do grow(kids[i], depth + 1) end end
+    end
+    grow(hostCfg.root, 0)
+    -- ★ 订单卡不用再偏移一次：上面那趟 grow 已经把 root 下所有控件都走过了
+    --   （包括订单卡）。我原来又补了一段"专门给订单卡加偏移" → **偏移被应用两次**
+    --   → 整块 UI 被推到屏幕外（本地出图直接看到方块跑出左边界）。
+  end
+
+
+  H.say('view', '\231\137\136\229\188\143v2\239\188\154\229\159\186\229\135\134 %sx720\239\188\136\229\174\185\229\153\168 %sx%s\239\188\140\231\188\169\230\148\190 %.3f\239\188\140\229\190\174\232\176\131 %s,%s\239\188\137',
+        tostring(math.floor(v.baseW)), tostring(W), tostring(H0), v.scale,
+        tostring(v.tuneX), tostring(v.tuneY))
+
+  -- ★★ 坐标标尺（脚本变量 ruler=1 打开）：在 5 个已知 x 位置放标记块 + 编号。
+  --   用途：让用户在真机上报告"最左/最右能看到哪个编号"，就能反推容器的真实范围与原点。
+  --   我在这上面盲猜过两次（以为"看着偏右"），所以改成直接量。
+  if tonumber(tostring(H.param('ruler', 0))) ~= 0 then
+    local marks = { -640, -320, 0, 320, 640 }
+    for i, mx in ipairs(marks) do
+      local blk = H.spawn(hostCfg, 'img', 'Ruler' .. i)
+      H.setPos(blk, mx, 200); H.setSize(blk, 60, 60)
+      H.setColor(blk, 255, 60, 60, 255)
+      local lb = H.spawn(hostCfg, 'text', 'RulerT' .. i)
+      H.setPos(lb, mx, 200); H.setSize(lb, 120, 30)
+      setFont(lb, 20, { 255, 255, 255 })
+      setText(lb, tostring(mx))
+      H.raiseTop(blk); H.raiseTop(lb)
+    end
+    H.say('view', '\229\157\144\230\160\135\230\160\135\229\176\186\229\183\178\229\187\186\239\188\154x = -640 / -320 / 0 / 320 / 640\239\188\136y=200\239\188\137')
+  end
+
+  -- ★★ HUD 放在**最后建**：这层的规则是"后建的盖在先建的上面"，
+  --   最后建就天然在最上层，不依赖 SetAsLastSibling（模拟器里实测它不改渲染顺序）。
+  v.hud = {}
+  -- ★★ HUD 底衬：文字直接压在游戏画面上（天空很亮）→ 白字看不见。
+  --   加一块**整条深色板**在最上层……不，Z 序是"后建的在上"，所以**先建底衬、再建文字**。
+  do
+    local bar = H.spawn(hostCfg, 'img', 'HudBar')
+    H.setPos(bar, 0, 196); H.setSize(bar, 1280, 74)
+    H.setColor(bar, 14, 17, 26, 205)
+    v.hud.bar = bar
+  end
+  v.hud.title = H.spawn(hostCfg, 'text', 'HudTitle')
+  H.setPos(v.hud.title, -320, 214); H.setSize(v.hud.title, 620, 34)
+  setFont(v.hud.title, 24, { 255, 224, 150 })
+  setText(v.hud.title, '\233\155\170\231\154\135\231\154\132\229\144\142\229\142\168     [v2]')
+  v.hud.clock = H.spawn(hostCfg, 'text', 'HudClock')
+  H.setPos(v.hud.clock, 320, 214); H.setSize(v.hud.clock, 620, 34)
+  setFont(v.hud.clock, 24, { 238, 246, 255 })
+  v.hud.stats = H.spawn(hostCfg, 'text', 'HudStats')
+  H.setPos(v.hud.stats, 0, 182); H.setSize(v.hud.stats, 1240, 28)
+  setFont(v.hud.stats, 18, { 210, 224, 248 })
+
+  -- ★★ 把 HUD/面板提到最上层 —— **必须放在 init 的最末尾**！
+  --   我第一次放在中间，结果后面建的订单卡把它推翻了（Z 序实测：Od_5 排最后 = 最上）。
+  do
+    local raised = 0
+    for _, ctl in ipairs({ v.hud.bar, v.hud.title, v.hud.clock, v.hud.stats,
+                           v.panel.box, v.panel.head }) do
+      if H.raiseTop(ctl) then raised = raised + 1 end
+    end
+    H.say('view', 'HUD/\233\157\162\230\157\191\229\183\178\230\143\144\229\136\176\230\156\128\228\184\138\229\177\130\239\188\154%d \228\184\170\239\188\136\230\148\190\229\156\168 init \230\156\171\229\176\190\239\188\137', raised)
+  end
+
+  return v
+end
+
+-- ── 把逻辑状态映射成控件属性（每帧；只读状态、改属性，不含玩法规则）──
+function V.sync(v, s)
+  if not v or not s then return end
+
+  -- HUD
+  local left = (s.phase == 'closing') and s.closingLeft or s.dayLeft
+  setText(v.hud.clock, string.format('\231\172\172 %d/%d \229\164\169   %02d:%02d   \230\128\187\229\137\169 %02d:%02d',
+      s.day, s.mode.days, math.floor(left / 60), math.floor(left % 60),
+      math.floor(s.totalLeft / 60), math.floor(s.totalLeft % 60)))
+  v._statsBase = string.format('\233\146\177 %d    \229\135\186\233\164\144 %d    \230\181\129\229\164\177 %d    \231\191\187\232\189\166 %d    \232\191\158\229\135\187 %d    \229\156\168\229\136\182 %d/%d    \231\173\137\229\128\153 %d',
+      s.money, s.served, s.left, s.mistakes, s.combo,
+      STATE.wipCount(s), CFG.kitchen.maxWip, s.orders and #s.orders or 0)
+  setText(v.hud.stats, v._statsBase)
+
+  -- 工位
+  local waitN = 0
+  for _, sl in ipairs(s.slips) do
+    if sl.cup.startedAt == nil and sl.cup.slotReady ~= true and sl.ready ~= true then waitN = waitN + 1 end
+  end
+  for _, st in ipairs(V.STATIONS) do
+    local slot = v.stations[st.id]
+    local mine = nil
+    for _, sl in ipairs(s.slips) do
+      local nx = STATE.nextStep(sl.cup)
+      if nx and nx.st == st.id then mine = sl; break end
+    end
+    if mine then
+      local nx = STATE.nextStep(mine.cup)
+      local rec = mine.cup.rec
+      local tag = (rec and rec.tag) and ('[' .. rec.tag .. '] ') or ''
+      local prog = ''
+      if nx.kind == 'mash' then prog = string.format('   \232\191\158\230\140\137 %d/%d', nx.done or 0, nx.taps or 1)
+      elseif nx.kind == 'hold' then prog = '   \230\140\137\228\189\143' end
+      setText(slot.body, tag .. nx.t .. prog)
+      -- 有活：在本色上提亮一档（一眼看出"现在该按这里"）
+      local a = st.accent
+      H.setColor(slot.box, math.min(255, a[1] + 42), math.min(255, a[2] + 42), math.min(255, a[3] + 42), 255)
+
+
+    else
+      if waitN > 0 then
+        setText(slot.body, string.format('\231\173\137\229\190\133\229\176\143\231\165\168   \239\188\136\229\144\142\229\142\168\230\187\161\228\186\134\239\188\140%d \230\157\175\229\156\168\231\173\137\229\144\141\233\162\157\239\188\137', waitN))
+      else
+        setText(slot.body, '\231\173\137\229\190\133\229\176\143\231\165\168')
+      end
+      local a = st.accent
+      H.setColor(slot.box, a[1], a[2], a[3], 255)
+
+    end
+  end
+
+  -- 打包台
+  do
+    local n, names = 0, {}
+    for _, sl in ipairs(s.slips) do
+      if sl.ready then
+        n = n + 1
+        if #names < 3 then names[#names + 1] = (sl.cup.rec and sl.cup.rec.name) or '?' end
+      end
+    end
+    local a = V.PACK.accent
+    if n > 0 then
+      -- 有东西等着交付：提亮一档（亮 = 提示"按空格"）
+      H.setColor(v.pack.box, math.min(255, a[1] + 40), math.min(255, a[2] + 40), math.min(255, a[3] + 40), 255)
+      setText(v.pack.label, string.format('%s  %s      \229\143\175\228\186\164\228\187\152 %d \230\157\175\239\188\154%s%s     \239\188\136\230\140\137\231\169\186\230\160\188\239\188\137',
+        V.PACK.name, V.PACK.key, n, table.concat(names, '\227\128\129'), n > 3 and ' \226\128\166' or ''))
+    else
+      H.setColor(v.pack.box, a[1], a[2], a[3], 255)
+      setText(v.pack.label, string.format('%s  %s      \230\154\130\230\151\182\230\178\161\230\156\137\232\166\129\228\186\164\228\187\152\231\154\132', V.PACK.name, V.PACK.key))
+    end
+  end
+
+  -- 订单行
+  local oi = 0
+  for _, o in ipairs(s.orders) do
+    oi = oi + 1
+    local card = v.orders[oi]
+    if not card then break end
+    H.show(card.box); H.show(card.edge); H.show(card.who); H.show(card.what)
+    H.show(card.pbar); H.show(card.pfil)
+    local frac = math.max(0, math.min(1, o.pat / (o.patMax > 0 and o.patMax or 1)))
+    local acc = o.inProgress and { 96, 150, 240 } or C.stepTodo
+    if frac < 0.28 then acc = C.bad end
+    H.setColor(card.box, C.cardBg[1], C.cardBg[2], C.cardBg[3], C.cardBg[4])
+    H.setColor(card.edge, acc[1], acc[2], acc[3], 255)
+    local q = o.inProgress and '\229\156\168\229\136\182' or ('\231\173\137\229\128\153 #' .. tostring(o.queueNo))
+    setText(card.who, string.format('%s    %s', o.name, q))
+    setText(card.what, string.format('%s %s   \229\183\178\229\129\154 %d/%d   \232\128\144\229\191\131 %d%%',
+        o.ice or '', o.sugar or '', o.made or 0, o.need, math.floor(frac * 100)))
+    H.setSize(card.pfil, math.max(1, math.floor(BAR_W * frac)), 10)
+    local pc = frac < 0.28 and C.bad or (frac < 0.6 and C.warn or C.good)
+    H.setColor(card.pfil, pc[1], pc[2], pc[3], 255)
+  end
+  for i = oi + 1, MAX_ORDERS do
+    local card = v.orders[i]
+    H.hideBox(card.box, card.edge, card.who, card.what, card.pbar, card.pfil)
+  end
+  if oi == 0 then setText(v.panel.head, '\231\173\137\229\128\153\229\140\186   \230\154\130\230\151\182\230\178\161\228\186\186') else setText(v.panel.head, '\231\173\137\229\128\153\229\140\186 / \229\156\168\229\136\182') end
+end
+
+-- ═══════════════════════════════════════════════════════════════════
+-- 界面态：菜单 / 结算页 / 总分  —— 直接借用 HUD 的三行文字，不另建控件
+--   （平台新建控件默认"纯白+可见"，少建少坑；而且上限只有 1000 个）
+-- ═══════════════════════════════════════════════════════════════════
+
+-- 隐藏/显示"玩区"的所有方块（进菜单时把它们收起来）
+--   注意：只隐藏，不销毁 —— 运行期不建不销毁是这层的铁律
+-- 菜单：标题 + 三个模式（用 HUD 三行显示，选中的左边加 ▶ ）
+function V.drawMenu(v, sel)
+  if not v then return end
+  local M = {
+    { key = 'quick', label = '\233\128\159\233\128\154' },
+    { key = 'fast',  label = '\230\160\135\229\135\134' },
+    { key = 'slow',  label = '\230\133\162\231\130\150' },
+  }
+  setFont(v.hud.title, 30, C.gold)
+  setText(v.hud.title, '\233\155\170\231\154\135\231\154\132\229\144\142\229\142\168')
+  local lines = {}
+  for i, m in ipairs(M) do
+    local mk = (i == sel) and '\226\150\182 ' or '   '
+    lines[#lines + 1] = string.format('%s%s. %s', mk, tostring(i), m.label)
+  end
+  setFont(v.hud.clock, 22, C.text)
+  setText(v.hud.clock, table.concat(lines, '     '))
+  setFont(v.hud.stats, 18, C.dim)
+  -- 把三个模式的实际时长写清楚（来自 config.lua：days / perDay）
+  -- ★ 字段名是 config 里的 `modes`（小写！）。我写成 MODES → nil → 在 boot() 里抛错
+  --   → **整个启动失败**（菜单、彩框全没有）。这类"取错字段"的错最阴险：
+  --   单测能过（drawMenu 没被调），只在真机/模拟器跑起来才炸。
+  local CFGM = __m_config().modes
+  local parts = {}
+  for i = 1, 3 do
+    local m = M[i] and CFGM[M[i].key]
+    if m then parts[#parts + 1] = string.format('%d=%d\229\164\169x%d\229\136\134', i, m.days, math.floor((m.perDay or 0) / 60)) end
+  end
+  local tipLine = '\230\140\137 1/2/3 \233\128\137\239\188\140\231\169\186\230\160\188\229\188\128\229\167\139          ' .. table.concat(parts, '   ')
+  v._statsBase = tipLine       -- 供入口追加"版本+场景"用（否则那行会只剩版本标记）
+  setText(v.hud.stats, tipLine)
+end
+
+-- 结算页 / 总分：把当日日报或最终评分写进标题与时钟行
+function V.drawResult(v, s)
+  if not v or not s then return end
+  if s.ended and s.result then
+    local r = s.result
+    setFont(v.hud.title, 30, C.gold)
+    setText(v.hud.title, string.format('\230\148\182\230\145\138\239\188\129\232\175\132\231\186\167 %s', tostring(r.rank)))
+    setFont(v.hud.clock, 24, C.text)
+    setText(v.hud.clock, string.format('\230\128\187\229\136\134 %d  \239\188\136\229\135\186\233\164\144 %d \194\183 \230\181\129\229\164\177 %d \194\183 \231\191\187\232\189\166 %d\239\188\137',
+      r.total or 0, s.served or 0, s.left or 0, s.mistakes or 0))
+    setFont(v.hud.stats, 18, C.dim)
+    setText(v.hud.stats, '\230\140\137\231\169\186\230\160\188\229\155\158\229\136\176\232\143\156\229\141\149\239\188\140\229\134\141\230\157\165\228\184\128\229\177\128')
+    return
+  end
+  if s.settling then
+    local last = s.dayStats and s.dayStats[#s.dayStats]
+    setFont(v.hud.title, 28, C.gold)
+    setText(v.hud.title, string.format('\231\172\172 %d \229\164\169\231\187\147\231\174\151\229\174\140\228\186\134', s.day))
+    setFont(v.hud.clock, 22, C.text)
+    if last then
+      setText(v.hud.clock, string.format('\229\135\186\233\164\144 %d \230\157\175 \194\183 \232\144\165\228\184\154\233\162\157 %d \194\183 \230\181\129\229\164\177 %d \194\183 \231\191\187\232\189\166 %d',
+        last.served or 0, last.revenue or 0, last.left or 0, last.mistakes or 0))
+    else
+      setText(v.hud.clock, '')
+    end
+    setFont(v.hud.stats, 18, C.dim)
+    setText(v.hud.stats, string.format('\230\136\191\233\146\177\229\183\178\228\187\152 \194\183 \230\137\139\228\184\138\232\191\152\229\137\169 %d \229\133\131      \230\140\137\231\169\186\230\160\188\231\187\167\231\187\173', s.money or 0))
+  end
+end
+
+return V
+
+  end)()
+  if __c_view == nil then __c_view = true end
+  return __c_view
+end
+-- ── 入口源码（与本层同级：能看见上面的缓存；生命周期函数在这里定义 = 真正的全局）──
+-- @entry
+-- xuehuang.lua —— 雪皇的后厨 · 千星客户端脚本入口（正式版）
+--
+-- 这一层只做四件事：
+--   ① 生命周期接线（OnInit / OnStart / OnUpdate）
+--   ② 状态机：菜单 → 营业 → 当日结算 → 总分 → 重开
+--   ③ 输入路由（按键 + 光标点击 → 逻辑层动作 / 界面操作）
+--   ④ 把逻辑层的事件变成提示文案
+-- ★ 它**不含任何玩法规则**：规则全在 kitchen/order/day 里，改规则不要改这个文件。
+--
+-- 平台契约（踩过的坑，别改回去）：
+--   · 建控件必须在 OnStart 及之后（InstantiateClientUIControl 在 OnInit 返回 nil）
+--   · 必须 script:EnableUpdate(true)，否则收不到 OnUpdate
+--   · game 的全局函数用点号调用；新建控件默认"纯白 + 可见"→ 建完立刻设色或隐藏
+--   · 光标点击要先 showCursor=true（host.lua 已设），且需要一个"光标检测区域"控件
+
+local H = __m_host()
+local G = __m_game()
+local V = __m_view()
+local IN = __m_input()
+local CFG = __m_config()
+
+local BUILD = 'xuehuang-d2'   -- 纯 ASCII，方便在日志里搜
+
+local built, bootErr = false, nil
+local v, hostCfg = nil, nil
+local banner, bannerT, _bannerActive = nil, 0, false
+local autoplay, heartbeat, showCounts, showBuild = false, false, false, true
+local scene = 'menu'        -- 'menu' | 'play'
+local menuMode = 1          -- 菜单上选中的模式（1..3）
+
+local function say(...) H.say('\233\155\170\231\154\135', ...) end
+local function tip(msg, sec)
+  banner, bannerT = tostring(msg), (sec or 2.0)
+  _bannerActive = true
+  if v and v.hud and v.hud.title then H.setText(v.hud.title, banner) end
+end
+
+-- ── 逻辑事件 → 提示 ──
+local function wireEvents()
+  G.on('arrive', function(e) tip(string.format('%s \232\166\129 %s %s %s', e.o.name, e.o.makeup, e.o.ice, e.o.sugar), 2.2) end)
+  G.on('leave',  function(e) tip(string.format('%s \231\173\137\228\184\141\229\143\138\232\181\176\228\186\134', e.o.name), 2.2) end)
+  G.on('lastcall', function() tip('\230\156\128\229\144\142\230\142\165\229\141\149\239\188\154\228\185\139\229\144\142\228\184\141\229\134\141\230\148\190\228\186\186\232\191\155\230\157\165', 3) end)
+  G.on('closing',  function() tip('\230\137\147\231\131\138\239\188\154\228\184\141\229\134\141\230\142\165\229\190\133\230\150\176\233\161\190\229\174\162\239\188\140\230\137\139\228\184\138\231\154\132\229\129\154\229\174\140\229\176\177\230\148\182\230\145\138', 3) end)
+  G.on('graceout', function() tip('\230\184\133\229\156\186\230\151\182\233\151\180\229\136\176\239\188\154\229\138\168\232\191\135\230\137\139\231\154\132\231\174\151\228\186\164\228\187\152\239\188\140\230\178\161\229\188\128\229\183\165\231\154\132\232\174\176\230\181\129\229\164\177', 3) end)
+  G.on('dayend',   function(e) tip(string.format('\231\172\172 %d \229\164\169\231\187\147\231\174\151', e.day), 3) end)
+end
+
+-- ── 状态机 ──
+local function enterMenu()
+  scene = 'menu'
+  if v then
+    local n = V.setBoardVisible(v, false)
+    say('\232\191\155\232\143\156\229\141\149\239\188\154\233\154\144\232\151\143\231\142\169\229\140\186 %d \228\184\170\230\142\167\228\187\182', n)
+  end
+end
+
+local function startGame(modeName)
+  local m = modeName or IN.MODES[menuMode] or 'fast'
+  G.newGame(m)
+  scene = 'play'
+  if v then
+    local n = V.setBoardVisible(v, true)
+    say('\229\188\128\229\177\128\239\188\154\230\152\190\231\164\186\231\142\169\229\140\186 %d \228\184\170\230\142\167\228\187\182', n)
+  end
+  tip(string.format('\229\188\128\229\188\160\239\188\129\230\140\137 1/H/K/P \229\129\154\229\183\165\228\189\141\239\188\140\231\169\186\230\160\188\230\137\147\229\140\133'), 3.5)
+end
+
+-- 菜单/结算页的按键消费；返回 true = 已消费
+local function uiAct(act)
+  if scene == 'menu' then
+    if act == 'confirm' or act == 'pack' or act == 'shake' then startGame(); return true end
+    return false
+  end
+  if G.s and (G.s.settling or G.s.ended) and (act == 'confirm' or act == 'pack') then
+    if G.s.ended then enterMenu() else G.nextDay() end
+    return true
+  end
+  return false
+end
+
+local function boot()
+  if built then return end
+  built = true
+  local ok, err = pcall(function()
+    local root = H.root()
+    if not root then error('\230\137\190\228\184\141\229\136\176\230\140\130\232\189\189\230\142\167\228\187\182\239\188\154\232\132\154\230\156\172\232\166\129\230\140\130\229\156\168**\229\174\162\230\136\183\231\171\175\230\142\167\228\187\182\229\174\185\229\153\168**\228\184\138') end
+    pcall(function() root:SetActive(true) end)
+    hostCfg = H.setup(root)
+    v = V.init(hostCfg)
+    autoplay   = tonumber(tostring(H.param('autoplay', 0))) ~= 0
+    heartbeat  = tonumber(tostring(H.param('heartbeat', 0))) ~= 0
+    showCounts = tonumber(tostring(H.param('showCounts', 0))) ~= 0
+    showBuild  = tonumber(tostring(H.param('showBuild', 1))) ~= 0
+    if autoplay then say('autoplay=1\239\188\154\230\156\186\229\153\168\228\186\186\230\155\191\231\142\169\229\174\182\230\137\147\239\188\136\230\156\172\229\156\176\229\135\186\229\155\190\231\148\168\239\188\137') end
+    wireEvents()
+    IN.attach(hostCfg, tip)
+    scene = 'menu'
+    V.setBoardVisible(v, false)   -- 初始就是菜单态：先把玩区藏起来
+    V.drawMenu(v, menuMode)
+    say('\229\183\178\229\176\177\231\187\170 BUILD=%s \226\128\148\226\128\148 \230\140\137\231\169\186\230\160\188\229\188\128\229\167\139', BUILD)
+    tip(string.format('BUILD=%s  \232\143\156\229\141\149\239\188\154\230\140\137 1/2/3 \233\128\137\230\168\161\229\188\143\239\188\140\231\169\186\230\160\188\229\188\128\229\167\139', BUILD), 6)
+    say('\232\143\156\229\141\149\229\186\148\230\152\190\231\164\186\239\188\154\233\155\170\231\154\135\231\154\132\229\144\142\229\142\168 + \228\184\137\228\184\170\230\168\161\229\188\143\239\188\136\230\144\156\230\151\165\229\191\151\233\135\140\231\154\132 xuehuang-d2 \231\161\174\232\174\164\231\137\136\230\156\172\239\188\137')
+  end)
+  if not ok then
+    bootErr = tostring(err)
+    say('BUILD-FAILED %s', bootErr)
+    pcall(function() if v and v.hud and v.hud.title then H.setText(v.hud.title, '!! ' .. bootErr) end end)
+  end
+end
+
+function OnInit()
+  say('OnInit\239\188\136\229\143\170\231\153\187\232\174\176\239\188\140\228\184\141\229\187\186\230\142\167\228\187\182\239\188\137')
+  if script and script.EnableUpdate then
+    local ok, e = pcall(function() script:EnableUpdate(true) end)
+    say('EnableUpdate(true) -> %s', ok and 'ok' or tostring(e))
+  end
+end
+
+function OnStart() boot() end
+
+local _heart = 0
+function OnUpdate(dt)
+  _heart = _heart + 1
+  if heartbeat and _heart % 60 == 0 then
+    say('\229\191\131\232\183\179 %d \229\184\167 \194\183 \229\156\186\230\153\175=%s \194\183 t=%s', _heart, tostring(scene),
+        G.s and string.format('%.1f', G.s.t) or 'nil')
+  end
+  if not built then boot() end
+  if bootErr then return end
+  local dt2 = dt or 0.033
+
+  -- ① 逻辑推进（结算页/总分时冻结）
+  if scene == 'play' and G.s and not G.s.settling and not G.s.ended then
+    local ok, err = pcall(function() G.tick(dt2) end)
+    if not ok then say('tick \229\135\186\233\148\153\239\188\154%s', tostring(err)); bootErr = tostring(err); return end
+  end
+
+  -- ② 自动演示（只在脚本变量 autoplay=1 时）
+  if autoplay and scene == 'play' then
+    pcall(function()
+      if G.s and G.s.settling then G.nextDay()
+      elseif G.s and not G.s.ended then __bot() end
+    end)
+  end
+
+  -- ③ 输入：界面层优先，剩下的给玩法
+  IN.pump({
+    tip = tip,
+    act = function(act, kind)
+      if uiAct(act) then return nil end
+      if scene ~= 'play' then return nil end
+      if act == 'click' then
+        if v then
+          for _, st in ipairs(V.STATIONS) do
+            local slot = v.stations[st.id]
+            if IN.hit(v, slot.box, 8) then IN.clearClick(); return G.act(st.id, 'press') end
+          end
+          if IN.hit(v, v.pack.box, 8) then IN.clearClick(); return G.act('pack', 'press') end
+        end
+        IN.clearClick()
+        return nil
+      end
+      if act == 'auto' then
+        CFG.auto.on = not CFG.auto.on
+        tip(CFG.auto.on and '\232\135\170\229\138\168\230\181\129\232\189\172\239\188\154\229\188\128\239\188\136\229\176\143\231\165\168\232\135\170\229\183\177\232\181\176\239\188\137' or '\232\135\170\229\138\168\230\181\129\232\189\172\239\188\154\229\133\179\239\188\136\232\166\129\228\189\160\228\186\178\230\137\139\233\128\129\239\188\137', 2)
+        return nil
+      end
+      if act == 'ticket' then
+        CFG.autoTicket.on = not CFG.autoTicket.on
+        tip(CFG.autoTicket.on and '\232\135\170\229\138\168\229\135\186\231\165\168\239\188\154\229\188\128' or '\232\135\170\229\138\168\229\135\186\231\165\168\239\188\154\229\133\179', 2)
+        return nil
+      end
+      return G.act(act, kind)
+    end,
+  })
+
+  -- ④ 画面
+  local okSync, errSync = pcall(V.sync, v, G.s)
+  if not okSync then say('V.sync \229\135\186\233\148\153\239\188\154%s', tostring(errSync)) end
+  -- ★ 玩区显隐：**每帧按 scene 对齐**（幂等，先设后不设）。
+  --   为什么不用"切换时调一次"：实测那次调用会被后续逻辑推翻（14 个控件设成显示、
+  --   下一帧又变回隐藏），查不出是谁干的。每帧对齐是"单一数据源"，不会再打架。
+  if v then V.setBoardVisible(v, scene == 'play') end
+
+  if scene == 'menu' then
+    local okM, errM = pcall(V.drawMenu, v, menuMode)
+    if not okM then
+      say('V.drawMenu \229\135\186\233\148\153\239\188\154%s', tostring(errM))
+      -- 出错也要让人看见：直接把错误写到标题上（比"什么都没有"强）
+      if v and v.hud and v.hud.title then H.setText(v.hud.title, 'DRAW-ERR ' .. tostring(errM)) end
+    end
+  end
+  -- ★ 常显"版本 + 场景"（不用日志就能确认跑的是哪一版）
+  --   ⚠️ 必须**基于本帧的原始文本重建**，不能往控件现有文字后面追加！
+  --   我第一版写成 H.setText(c, c.text .. '...') → 每帧追加一次 → 那行几秒后涨到几千字
+  --   （本地量出来 "[xuehuang-d2 menu]" 重复了 5 次，还在涨）。这是"文字乱掉/看不见"的经典坑。
+  if v and v.hud and v.hud.stats then
+    local base = v._statsBase or ''
+    local extra = ''
+    if showBuild then extra = extra .. '    [' .. BUILD .. ' ' .. tostring(scene) .. ']' end
+    if showCounts then extra = extra .. '   |   ' .. __counts() end
+    if extra ~= '' then H.setText(v.hud.stats, base .. extra) end
+  end
+  if v and G.s and (G.s.settling or G.s.ended) then
+    local okR, errR = pcall(V.drawResult, v, G.s)
+    if not okR then say('V.drawResult \229\135\186\233\148\153\239\188\154%s', tostring(errR)) end
+  end
+
+  -- ⑤ 提示计时（放在最后：横幅显示期间它说了算；横幅结束后**只重置一次**，别每帧覆盖菜单/结算）
+  if bannerT > 0 then
+    bannerT = bannerT - dt2
+    if bannerT <= 0 then
+      _bannerActive = false
+      if v and v.hud and v.hud.title and scene == 'play' then H.setText(v.hud.title, '\233\155\170\231\154\135\231\154\132\229\144\142\229\142\168') end
+    end
+  end
+end
+
+function OnLevelUpdate(dt) end
+function OnDestroy() end
+
+-- ── 外部调用入口（script:Invoke）＋ 自检 ──
+function __state()
+  local s = G.s
+  if not s then return 'no-game' end
+  return H.fmt('scene=%s t=%.1f day=%d/%d phase=%s orders=%d slips=%d served=%d money=%d ended=%s',
+    tostring(scene), s.t, s.day, s.mode.days, s.phase, #s.orders, #s.slips, s.served, s.money, tostring(s.ended))
+end
+function __act(stationId, kind)
+  local r = G.act(tostring(stationId), tostring(kind or 'press'))
+  return (r and r.ok) and 'ok' or ('no: ' .. tostring(r and r.why))
+end
+function __bot()
+  local K = __m_kitchen(); local S = __m_state()
+  local s = G.s
+  if not s or s.ended then return 'done' end
+  if s.settling then G.nextDay(); return 'nextday' end
+  for _, sl in ipairs(s.slips) do
+    if sl.ready then K.deliverCup(s, sl); return 'pack' end
+    local nx = S.nextStep(sl.cup)
+    if nx then
+      if sl.st ~= nx.st then K.routeSlip(s, sl, nx.st) end
+      if nx.kind == 'hold' then nx.holdOn = true; K.tickHolds(s, 0.05) else K.pressStep(s, sl) end
+      return 'work'
+    end
+  end
+  for _, o in ipairs(s.orders) do for _, c in ipairs(o.cups) do
+    if not c.made and K.slipFor(s, c) == nil and c.slotReady then G.startCup(c.rec.id); return 'start' end
+  end end
+  return 'idle'
+end
+function __counts()
+  local imgOn, imgAll, txtOn, txtAll = 0, 0, 0, 0
+  local function walk(c, depth)
+    if not c or depth > 3 then return end
+    local t = H.kindOf(c)
+    local on = false
+    pcall(function() on = (c.active ~= false) and (c.visible ~= false) end)
+    if t:find('Image', 1, true) then imgAll = imgAll + 1; if on then imgOn = imgOn + 1 end end
+    if t:find('TextBox', 1, true) then txtAll = txtAll + 1; if on then txtOn = txtOn + 1 end end
+    local ok, kids = pcall(function() return c:GetChildren() end)
+    if ok and type(kids) == 'table' then for i = 1, #kids do walk(kids[i], depth + 1) end end
+  end
+  if hostCfg and hostCfg.root then walk(hostCfg.root, 0) end
+  return string.format('IMG %d/%d  TXT %d/%d', imgOn, imgAll, txtOn, txtAll)
+end
+-- 自检：把每个方块的 active/visible 报出来（排查"方块没显示"这类问题）
+function __diag()
+  local out = {}
+  local function st(c, tag)
+    if not c then out[#out + 1] = tag .. '=nil'; return end
+    local a, vis = '?', '?'
+    pcall(function() a = tostring(c.active) end)
+    pcall(function() vis = tostring(c.visible) end)
+    out[#out + 1] = string.format('%s(%s,%s)', tag, a, vis)
+  end
+  if v then
+    for _, sid in ipairs({ 'shake', 'fire', 'chem', 'brew' }) do
+      local slot = v.stations[sid]
+      if slot then st(slot.box, 'box_' .. sid); st(slot.edge, 'edge_' .. sid) end
+    end
+    st(v.pack.box, 'pack')
+    st(v.hud.title, 'hud')
+  end
+  local txt = 'DBG scene=' .. tostring(scene) .. ' dim=' .. tostring(v and v.dimmed) .. ' ' .. table.concat(out, ' ')
+  if v and v.hud and v.hud.title then H.setText(v.hud.title, txt) end
+  return txt
+end
+function __menu(m)
+  if m then menuMode = math.max(1, math.min(3, tonumber(m) or 1)) end
+  if scene == 'menu' and v then V.drawMenu(v, menuMode) end
+  return 'mode=' .. tostring(IN.MODES[menuMode]) .. ' scene=' .. tostring(scene)
+end
+
+return { OnInit = OnInit, OnStart = OnStart, OnUpdate = OnUpdate,
+         OnLevelUpdate = OnLevelUpdate, OnDestroy = OnDestroy,
+         __state = __state, __act = __act, __bot = __bot, __counts = __counts, __menu = __menu, __diag = __diag }
+
+end

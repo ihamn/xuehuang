@@ -27,6 +27,7 @@ local STATE = require('state')
 local CFG = require('config')
 local SK = require('skin')
 local K = require('kitchen')   -- 只为读"当前这步的进度"（只读快照，不碰玩法状态）
+local D = require('diag')      -- ★ 诊断构建才存在；回退时一并删除
 local IN = require('input')    -- 只为读"实际绑定的键位"（让界面显示和真按键一致）
 
 local V = {}
@@ -67,16 +68,18 @@ local txtCache, styleCache = {}, {}
 local function setText(c, s)
   if not c then return end
   s = tostring(s)
-  if txtCache[c] == s then return end
+  -- ★ forceWrite=1 时无视缓存，每帧强制写（作者给的排查技巧）
+  if not D.forceWrite and txtCache[c] == s then D.cacheSkip('view.setText', c, s) return end
   txtCache[c] = s
-  pcall(function() c.text = s end)
+  D.try('view.setText', c, s, function() c.text = s end)
 end
 local function setStyle(c, size, col)
   if not c then return end
   local key = tostring(size) .. '|' .. (col and (col[1] * 65536 + col[2] * 256 + col[3]) or 'd')
-  if styleCache[c] == key then return end
+  if not D.forceWrite and styleCache[c] == key then D.cacheSkip('view.setStyle', c, key) return end
   styleCache[c] = key
-  pcall(function()
+  -- ★ 这里是全工程**唯一没有护栏的字号写入**（host.setFont 有 math.floor 兜底，这条没有）
+  D.try('view.setStyle', c, size, function()
     if size then c.fontSize = size end
     if col then c.fontColor = Color.FromRGB(col[1], col[2], col[3]) end
   end)
@@ -147,8 +150,8 @@ function V.setMenuVisible(v, on)
     if bag and bag.controls then
       for _, c in ipairs(bag.controls) do
         if c then
-          pcall(function() c:SetActive(on and true or false) end)
-          pcall(function() c:SetVisible(on and true or false) end)
+          D.try('view.menuVisible.active', c, on, function() c:SetActive(on and true or false) end)
+          D.try('view.menuVisible.visible', c, on, function() c:SetVisible(on and true or false) end)
         end
       end
     end
@@ -160,8 +163,8 @@ function V.setBoardVisible(v, on)
   local n = 0
   local function toggle(ctl)
     if not ctl then return end
-    pcall(function() ctl:SetActive(on and true or false) end)
-    pcall(function() ctl:SetVisible(on and true or false) end)
+    D.try('view.boardVisible.active', ctl, on, function() ctl:SetActive(on and true or false) end)
+    D.try('view.boardVisible.visible', ctl, on, function() ctl:SetVisible(on and true or false) end)
     n = n + 1
   end
   local function each(list) for _, c in ipairs(list) do toggle(c) end end
@@ -928,8 +931,8 @@ function V.drawMenu(v, sel)
   setText(v.big.line4, ''); setText(v.big.line5, '')
   -- ★ 最后**直接 SetVisible(true)**（H.show 对这批无效，且 SetVisible 紧跟 SetActive 会翻回 false）
   for _, c in ipairs(M.controls) do
-    pcall(function() c:SetActive(true) end)
-    pcall(function() c:SetVisible(true) end)
+    D.try('view.menuBig.active', c, true, function() c:SetActive(true) end)
+    D.try('view.menuBig.visible', c, true, function() c:SetVisible(true) end)
   end
 end
 
@@ -938,7 +941,7 @@ end
 -- ═══════════════════════════════════════════════════════════════════
 function V.drawResult(v, s)
   if not v or not s then return end
-  for _, c in ipairs(v.big.controls) do pcall(function() c:SetVisible(true) end) end
+  for _, c in ipairs(v.big.controls) do D.try('view.big.visible', c, true, function() c:SetVisible(true) end) end
   -- 环保凭证（★ 两个结算页面都用它）
   --   ★ 2026-10-01 用户定：**只保留"固化下来的减碳"，不搞碳排放计算**。
   --   所以这里只有两句话：固化了几毫克 + 一句一本正经的感谢。

@@ -19,11 +19,13 @@ local G = require('game')
 local V = require('view')
 local IN = require('input')
 local CFG = require('config')
+local D = require('diag')      -- ★ 诊断构建才存在；回退时一并删除
 
 local BUILD = 'xuehuang-r3'   -- 纯 ASCII，方便在日志里搜（r3 = 出餐双键 + 按键探针 + 名额硬上界）
 
 local built, bootErr = false, nil
 local _tickErrShown = false
+local _bootLogged = false       -- ★ 诊断：bootErr/启动成功各只打一行
 local v, hostCfg = nil, nil
 local banner, bannerT, _bannerActive = nil, 0, false
 -- ★ showCounts **默认关**：HUD 上不该出现调试尾巴（要看就在脚本变量里设 showCounts=1）
@@ -147,6 +149,9 @@ local function boot()
     --     让键盘路径与鼠标路径在引擎看来完全同类。
     --   （本地要临时验证"回调直呼"旧行为，把这里改成 false 即可。）
     IN.forceQueue = true
+    -- ★ 诊断开关（脚本变量，编辑器里定义才生效）：diag=0 关诊断；forceWrite=1 每帧无视缓存强制写
+    D.setup(tonumber(tostring(H.param('diag', 1))) ~= 0,
+            tonumber(tostring(H.param('forceWrite', 0))) ~= 0)
     -- ★ 按键探针默认开：按一下键就会在日志里留下 [KDOWN X] 一行（keyLog=0 可关）。
     --   注意：H.param 拿到的是**编辑器里定义的值**，编辑器没定义才用默认值 ——
     --   所以诊断不能依赖"我在编辑器里设了开关"，见下面每秒状态行的注释。
@@ -197,7 +202,11 @@ function OnUpdate(dt)
         G.s and string.format('%.1f', G.s.t) or 'nil')
   end
   if not built then boot() end
-  if bootErr then return end
+  if bootErr then
+    if not _bootLogged then _bootLogged = true; D.boot(bootErr) end
+    return
+  end
+  if not _bootLogged then _bootLogged = true; D.boot(nil) end   -- 第一帧确认启动成功
   local dt2 = dt or 0.033
 
   -- ① 逻辑推进（结算页/总分时冻结；暂停时不推进）
@@ -243,7 +252,8 @@ function OnUpdate(dt)
     --   ⚠️ 只读 s 刷画面，不推进逻辑 → 不会"一次按键走两步"。
     afterAct = function()
       if not v then return end
-      pcall(V.sync, v, G.s)
+      local okA, errA = pcall(V.sync, v, G.s)
+      if not okA then D.afterAct(errA) end
       -- 玩区/菜单显隐也按当前场景对齐（与 OnUpdate 里同一套，幂等）
       V.setBoardVisible(v, scene == 'play')
       V.setMenuVisible(v, scene ~= 'play')
@@ -366,6 +376,7 @@ function OnUpdate(dt)
   -- ④ 画面
   local okSync, errSync = pcall(V.sync, v, G.s)
   if not okSync then say('V.sync 出错：%s', tostring(errSync)) end
+  D.summary(_heart)          -- ★ 每 30 帧一行 [WERR-SUM]（没错误就不打）
   -- ★ 玩区显隐：**每帧按 scene 对齐**（幂等，先设后不设）。
   --   为什么不用"切换时调一次"：实测那次调用会被后续逻辑推翻（14 个控件设成显示、
   --   下一帧又变回隐藏），查不出是谁干的。每帧对齐是"单一数据源"，不会再打架。

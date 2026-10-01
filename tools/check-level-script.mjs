@@ -39,9 +39,10 @@ const FEATURES = [
   ['wipGateCount', '名额硬上界（r1 修的 bug）'],
   ['__IN_ACT', '键回调直呼（d2 就有）'],
   ["pack2", '出餐备用键 Z（r3）'],
+  ['xuehuang-diag-w1', '★ 诊断构建标记（写入链路诊断那一版；没有它=跑的不是诊断版）'],
 ];
 const EXPECT = 'xuehuang-r3';
-const DISK = ['dist/xuehuang.lua', 'out/xuehuang.lua'].map(p => path.join(path.resolve(import.meta.dirname, '..'), p));
+const DISK = ['dist/xuehuang.lua', 'dist/xuehuang.diag.lua', 'out/xuehuang.lua'].map(p => path.join(path.resolve(import.meta.dirname, '..'), p));
 
 function levels() {
   const out = [];
@@ -82,6 +83,8 @@ for (const L of ls) {
   console.log(`    版本标语: ${tags.length ? tags.join(' , ') : '（没找到 BUILD 标语）'}`);
   for (const f of feats) console.log(`    ${f}`);
   console.log(`    判定: ${ok ? `✓ 是新版（${EXPECT}）` : `✗ 不是 ${EXPECT} —— 编辑器里那份副本没更新，要去"重新导入脚本"`}`);
+  const gilText = fs.readFileSync(L.gil, 'latin1');
+  console.log(`    诊断版标记 xuehuang-diag-w1: ${gilText.includes('xuehuang-diag-w1') ? '★ 有 → 这一版带写入链路诊断' : '无 → 跑的不是诊断版（重新导入 + 保存关卡后才会有）'}`);
   // 磁盘副本对一下
   const dst = path.join(L.luaDir, 'xuehuang.lua');
   if (fs.existsSync(dst)) {
